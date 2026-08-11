@@ -1,10 +1,24 @@
-from typing import Optional
 from uuid import UUID
 
-from ..entities.barrier import Barrier, BarrierType, BarrierStatus, Severity, BarrierPhoto, BarrierConfirmation, BarrierComplaint
+from ..entities.barrier import (
+    Barrier,
+    BarrierComplaint,
+    BarrierConfirmation,
+    BarrierPhoto,
+    BarrierStatus,
+    BarrierType,
+    Severity,
+)
+from ..events import BarrierApproved, BarrierCreated, BarrierRejected, BarrierResolved
+from ..repositories import (
+    BarrierComplaintRepository,
+    BarrierConfirmationRepository,
+    BarrierPhotoRepository,
+    BarrierRepository,
+    EventBus,
+    PhotoStorage,
+)
 from ..value_objects.coordinates import Coordinates
-from ..repositories import BarrierRepository, BarrierPhotoRepository, BarrierConfirmationRepository, BarrierComplaintRepository, PhotoStorage, EventBus
-from ..events import BarrierCreated, BarrierApproved, BarrierRejected, BarrierResolved
 
 
 class BarrierService:
@@ -57,16 +71,16 @@ class BarrierService:
 
         return created
 
-    async def get_barrier(self, barrier_id: UUID) -> Optional[Barrier]:
+    async def get_barrier(self, barrier_id: UUID) -> Barrier | None:
         return await self.barrier_repo.get_by_id(barrier_id)
 
     async def list_barriers(
         self,
-        status: Optional[BarrierStatus] = None,
-        type: Optional[BarrierType] = None,
-        severity_min: Optional[Severity] = None,
-        severity_max: Optional[Severity] = None,
-        bounds: Optional[tuple] = None,
+        status: BarrierStatus | None = None,
+        type: BarrierType | None = None,
+        severity_min: Severity | None = None,
+        severity_max: Severity | None = None,
+        bounds: tuple | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list:

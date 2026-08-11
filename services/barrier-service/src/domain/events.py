@@ -1,17 +1,17 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 from uuid import UUID
-from typing import Dict, Any
 
 
 @dataclass
 class DomainEvent:
     event_type: str
     aggregate_id: UUID
-    timestamp: datetime = datetime.utcnow()
-    payload: Dict[str, Any] = None
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    payload: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_type": self.event_type,
             "aggregate_id": str(self.aggregate_id),
@@ -22,7 +22,7 @@ class DomainEvent:
 
 @dataclass
 class BarrierCreated(DomainEvent):
-    def __init__(self, barrier_id: UUID, payload: Dict[str, Any]):
+    def __init__(self, barrier_id: UUID, payload: dict[str, Any]):
         super().__init__(
             event_type="barrier.created",
             aggregate_id=barrier_id,
@@ -32,7 +32,7 @@ class BarrierCreated(DomainEvent):
 
 @dataclass
 class BarrierApproved(DomainEvent):
-    def __init__(self, barrier_id: UUID, payload: Dict[str, Any]):
+    def __init__(self, barrier_id: UUID, payload: dict[str, Any]):
         super().__init__(
             event_type="barrier.approved",
             aggregate_id=barrier_id,
@@ -42,7 +42,7 @@ class BarrierApproved(DomainEvent):
 
 @dataclass
 class BarrierRejected(DomainEvent):
-    def __init__(self, barrier_id: UUID, payload: Dict[str, Any]):
+    def __init__(self, barrier_id: UUID, payload: dict[str, Any]):
         super().__init__(
             event_type="barrier.rejected",
             aggregate_id=barrier_id,
@@ -52,7 +52,7 @@ class BarrierRejected(DomainEvent):
 
 @dataclass
 class BarrierResolved(DomainEvent):
-    def __init__(self, barrier_id: UUID, payload: Dict[str, Any]):
+    def __init__(self, barrier_id: UUID, payload: dict[str, Any]):
         super().__init__(
             event_type="barrier.resolved",
             aggregate_id=barrier_id,

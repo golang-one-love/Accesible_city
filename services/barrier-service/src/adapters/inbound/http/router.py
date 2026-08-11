@@ -1,47 +1,45 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from typing import Optional
+from typing import cast
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+
+from src.adapters.inbound.http.security import get_current_user_id
+from src.application.dto.schemas import (
+    BarrierListResponse,
+    BarrierResponse,
+    BarrierStatusStr,
+    BarrierTypeStr,
+    ComplainBarrierRequest,
+    ComplainBarrierResponse,
+    ConfirmBarrierResponse,
+    CreateBarrierRequest,
+    ErrorResponse,
+    SeverityInt,
+    UploadPhotoResponse,
+)
 from src.application.use_cases.barrier_use_cases import (
+    ApproveBarrierUseCase,
+    ComplainBarrierUseCase,
+    ConfirmBarrierUseCase,
     CreateBarrierUseCase,
     GetBarrierUseCase,
     ListBarriersUseCase,
-    UploadPhotoUseCase,
-    ConfirmBarrierUseCase,
-    ComplainBarrierUseCase,
-    ApproveBarrierUseCase,
     RejectBarrierUseCase,
     ResolveBarrierUseCase,
+    UploadPhotoUseCase,
 )
-from src.application.dto.schemas import (
-    CreateBarrierRequest,
-    BarrierResponse,
-    BarrierListResponse,
-    UploadPhotoResponse,
-    ConfirmBarrierResponse,
-    ComplainBarrierRequest,
-    ComplainBarrierResponse,
-    ErrorResponse,
-    BarrierTypeStr,
-    BarrierStatusStr,
-    SeverityInt,
-)
-from src.domain.entities.barrier import BarrierType, BarrierStatus, Severity
-from src.domain.value_objects.coordinates import Coordinates
-from src.adapters.inbound.http.security import get_current_user_id, get_current_user_id_optional
-
 
 router = APIRouter(prefix="/api/v1/barriers", tags=["barriers"])
 
-create_barrier_uc: CreateBarrierUseCase = None
-get_barrier_uc: GetBarrierUseCase = None
-list_barriers_uc: ListBarriersUseCase = None
-upload_photo_uc: UploadPhotoUseCase = None
-confirm_barrier_uc: ConfirmBarrierUseCase = None
-complain_barrier_uc: ComplainBarrierUseCase = None
-approve_barrier_uc: ApproveBarrierUseCase = None
-reject_barrier_uc: RejectBarrierUseCase = None
-resolve_barrier_uc: ResolveBarrierUseCase = None
+create_barrier_uc = cast(CreateBarrierUseCase, None)
+get_barrier_uc = cast(GetBarrierUseCase, None)
+list_barriers_uc = cast(ListBarriersUseCase, None)
+upload_photo_uc = cast(UploadPhotoUseCase, None)
+confirm_barrier_uc = cast(ConfirmBarrierUseCase, None)
+complain_barrier_uc = cast(ComplainBarrierUseCase, None)
+approve_barrier_uc = cast(ApproveBarrierUseCase, None)
+reject_barrier_uc = cast(RejectBarrierUseCase, None)
+resolve_barrier_uc = cast(ResolveBarrierUseCase, None)
 
 
 def init_router(
@@ -102,21 +100,21 @@ async def get_barrier(barrier_id: UUID):
     response_model=BarrierListResponse,
 )
 async def list_barriers(
-    status: Optional[BarrierStatusStr] = None,
-    type: Optional[BarrierTypeStr] = None,
-    severity_min: Optional[SeverityInt] = None,
-    severity_max: Optional[SeverityInt] = None,
-    sw_lat: Optional[float] = None,
-    sw_lon: Optional[float] = None,
-    ne_lat: Optional[float] = None,
-    ne_lon: Optional[float] = None,
+    barrier_status: BarrierStatusStr | None = Query(default=None, alias="status"),
+    type: BarrierTypeStr | None = None,
+    severity_min: SeverityInt | None = None,
+    severity_max: SeverityInt | None = None,
+    sw_lat: float | None = None,
+    sw_lon: float | None = None,
+    ne_lat: float | None = None,
+    ne_lon: float | None = None,
     limit: int = 100,
     offset: int = 0,
 ):
     from src.application.dto.schemas import CoordinatesDTO
     
     bounds = None
-    if all(v is not None for v in [sw_lat, sw_lon, ne_lat, ne_lon]):
+    if sw_lat is not None and sw_lon is not None and ne_lat is not None and ne_lon is not None:
         bounds = (
             CoordinatesDTO(latitude=sw_lat, longitude=sw_lon),
             CoordinatesDTO(latitude=ne_lat, longitude=ne_lon),
@@ -124,7 +122,7 @@ async def list_barriers(
     
     try:
         return await list_barriers_uc.execute(
-            status=status,
+            status=barrier_status,
             type=type,
             severity_min=severity_min,
             severity_max=severity_max,
@@ -149,7 +147,13 @@ async def upload_photo(
 ):
     try:
         data = await file.read()
-        return await upload_photo_uc.execute(barrier_id, user_id, file.filename, file.content_type, data)
+        return await upload_photo_uc.execute(
+            barrier_id,
+            user_id,
+            file.filename or "upload",
+            file.content_type or "application/octet-stream",
+            data,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

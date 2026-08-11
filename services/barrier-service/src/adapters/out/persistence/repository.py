@@ -1,23 +1,30 @@
-from typing import Optional, List, Tuple
 from uuid import UUID
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+from sqlalchemy import and_, func, select
+
+from src.adapters.out.persistence.database import async_session_factory
+from src.adapters.out.persistence.models import (
+    BarrierComplaintModel,
+    BarrierConfirmationModel,
+    BarrierModel,
+    BarrierPhotoModel,
+)
 from src.domain.entities.barrier import (
-    Barrier, BarrierType, BarrierStatus, Severity,
-    BarrierPhoto, BarrierConfirmation, BarrierComplaint
+    Barrier,
+    BarrierComplaint,
+    BarrierConfirmation,
+    BarrierPhoto,
+    BarrierStatus,
+    BarrierType,
+    Severity,
+)
+from src.domain.repositories import (
+    BarrierComplaintRepository,
+    BarrierConfirmationRepository,
+    BarrierPhotoRepository,
+    BarrierRepository,
 )
 from src.domain.value_objects.coordinates import Coordinates
-from src.domain.repositories import (
-    BarrierRepository, BarrierPhotoRepository,
-    BarrierConfirmationRepository, BarrierComplaintRepository
-)
-from src.adapters.out.persistence.models import (
-    BarrierModel, BarrierPhotoModel,
-    BarrierConfirmationModel, BarrierComplaintModel
-)
-from src.adapters.out.persistence.database import async_session_factory
 
 
 class PostgresBarrierRepository(BarrierRepository):
@@ -29,7 +36,7 @@ class PostgresBarrierRepository(BarrierRepository):
             await session.refresh(model)
             return self._to_entity(model)
 
-    async def get_by_id(self, barrier_id: UUID) -> Optional[Barrier]:
+    async def get_by_id(self, barrier_id: UUID) -> Barrier | None:
         async with async_session_factory() as session:
             stmt = select(BarrierModel).where(BarrierModel.id == barrier_id)
             result = await session.execute(stmt)
@@ -38,7 +45,7 @@ class PostgresBarrierRepository(BarrierRepository):
                 return self._to_entity(model)
             return None
 
-    async def get_by_ids(self, barrier_ids: List[UUID]) -> List[Barrier]:
+    async def get_by_ids(self, barrier_ids: list[UUID]) -> list[Barrier]:
         async with async_session_factory() as session:
             stmt = select(BarrierModel).where(BarrierModel.id.in_(barrier_ids))
             result = await session.execute(stmt)
@@ -50,7 +57,7 @@ class PostgresBarrierRepository(BarrierRepository):
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             if not model:
-                return None
+                raise ValueError("Barrier not found")
             self._update_model(model, barrier)
             await session.commit()
             await session.refresh(model)
@@ -58,14 +65,14 @@ class PostgresBarrierRepository(BarrierRepository):
 
     async def list(
         self,
-        status: Optional[BarrierStatus] = None,
-        type: Optional[BarrierType] = None,
-        severity_min: Optional[Severity] = None,
-        severity_max: Optional[Severity] = None,
-        bounds: Optional[Tuple[Coordinates, Coordinates]] = None,
+        status: BarrierStatus | None = None,
+        type: BarrierType | None = None,
+        severity_min: Severity | None = None,
+        severity_max: Severity | None = None,
+        bounds: tuple[Coordinates, Coordinates] | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Barrier]:
+    ) -> list[Barrier]:
         async with async_session_factory() as session:
             stmt = select(BarrierModel)
 
@@ -98,8 +105,8 @@ class PostgresBarrierRepository(BarrierRepository):
 
     async def count(
         self,
-        status: Optional[BarrierStatus] = None,
-        type: Optional[BarrierType] = None,
+        status: BarrierStatus | None = None,
+        type: BarrierType | None = None,
     ) -> int:
         async with async_session_factory() as session:
             stmt = select(func.count(BarrierModel.id))
@@ -177,13 +184,13 @@ class PostgresBarrierPhotoRepository(BarrierPhotoRepository):
             await session.refresh(model)
             return self._to_entity(model)
 
-    async def get_by_barrier_id(self, barrier_id: UUID) -> List[BarrierPhoto]:
+    async def get_by_barrier_id(self, barrier_id: UUID) -> list[BarrierPhoto]:
         async with async_session_factory() as session:
             stmt = select(BarrierPhotoModel).where(BarrierPhotoModel.barrier_id == barrier_id)
             result = await session.execute(stmt)
             return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def get_by_id(self, photo_id: UUID) -> Optional[BarrierPhoto]:
+    async def get_by_id(self, photo_id: UUID) -> BarrierPhoto | None:
         async with async_session_factory() as session:
             stmt = select(BarrierPhotoModel).where(BarrierPhotoModel.id == photo_id)
             result = await session.execute(stmt)

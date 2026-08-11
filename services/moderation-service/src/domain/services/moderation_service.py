@@ -1,9 +1,8 @@
-from typing import Optional
 from uuid import UUID
 
 from ..entities.moderation import ModerationRequest, ModerationStatus
-from ..repositories import ModerationRepository, EventBus
-from ..events import BarrierCreated, BarrierApproved, BarrierRejected
+from ..events import BarrierApproved, BarrierCreated, BarrierRejected
+from ..repositories import EventBus, ModerationRepository
 
 
 class ModerationService:
@@ -24,7 +23,7 @@ class ModerationService:
 
         request = ModerationRequest(
             barrier_id=event.aggregate_id,
-            reporter_id=UUID(event.payload.get("reporter_id", "")),
+            reporter_id=UUID(event.payload.get("reporter_id", "") if event.payload else ""),
         )
         return await self.moderation_repo.create(request)
 
@@ -38,6 +37,9 @@ class ModerationService:
 
         request.approve(moderator_id, comment)
         updated = await self.moderation_repo.update(request)
+
+        if request.barrier_id is None:
+            raise ValueError("Moderation request has no barrier_id")
 
         await self.event_bus.publish(
             "barrier.approved",
@@ -66,6 +68,9 @@ class ModerationService:
         request.reject(moderator_id, comment)
         updated = await self.moderation_repo.update(request)
 
+        if request.barrier_id is None:
+            raise ValueError("Moderation request has no barrier_id")
+
         await self.event_bus.publish(
             "barrier.rejected",
             BarrierRejected(
@@ -84,11 +89,11 @@ class ModerationService:
 
     async def get_queue(
         self,
-        status: Optional[ModerationStatus] = None,
+        status: ModerationStatus | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list:
         return await self.moderation_repo.list(status=status, limit=limit, offset=offset)
 
-    async def get_request(self, request_id: UUID) -> Optional[ModerationRequest]:
+    async def get_request(self, request_id: UUID) -> ModerationRequest | None:
         return await self.moderation_repo.get_by_id(request_id)

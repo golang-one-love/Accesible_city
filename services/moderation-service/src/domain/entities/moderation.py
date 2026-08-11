@@ -1,7 +1,6 @@
-from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from enum import Enum
 from uuid import UUID, uuid4
 
 
@@ -14,14 +13,14 @@ class ModerationStatus(str, Enum):
 @dataclass
 class ModerationRequest:
     id: UUID = field(default_factory=uuid4)
-    barrier_id: UUID = None
-    reporter_id: UUID = None
+    barrier_id: UUID | None = None
+    reporter_id: UUID | None = None
     status: ModerationStatus = ModerationStatus.PENDING
-    moderator_id: Optional[UUID] = None
+    moderator_id: UUID | None = None
     moderator_comment: str = ""
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    reviewed_at: Optional[datetime] = None
+    reviewed_at: datetime | None = None
 
     def approve(self, moderator_id: UUID, comment: str = "") -> None:
         if self.status != ModerationStatus.PENDING:

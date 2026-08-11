@@ -1,16 +1,14 @@
 from dataclasses import dataclass
-from typing import Optional, List
 from uuid import UUID
 
-from src.domain.entities.moderation import ModerationRequest, ModerationStatus
-from src.domain.repositories import ModerationRepository
-from src.domain.services.moderation_service import ModerationService
 from src.application.dto.schemas import (
-    ModerationRequestResponse,
-    ModerationQueueResponse,
     ModerationActionRequest,
     ModerationActionResponse,
+    ModerationQueueResponse,
+    ModerationRequestResponse,
 )
+from src.domain.entities.moderation import ModerationRequest, ModerationStatus
+from src.domain.services.moderation_service import ModerationService
 
 
 class ModerationNotFoundError(Exception):
@@ -27,7 +25,7 @@ class GetQueueUseCase:
 
     async def execute(
         self,
-        status: Optional[ModerationStatus] = None,
+        status: ModerationStatus | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> ModerationQueueResponse:

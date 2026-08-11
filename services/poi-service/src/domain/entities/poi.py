@@ -1,7 +1,7 @@
-from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 
@@ -41,9 +41,9 @@ class AccessibilityFeature(str, Enum):
 
 @dataclass
 class AccessibilityProfile:
-    features: List[AccessibilityFeature] = field(default_factory=list)
-    entrance_step_height_cm: Optional[int] = None
-    door_width_cm: Optional[int] = None
+    features: list[AccessibilityFeature] = field(default_factory=list)
+    entrance_step_height_cm: int | None = None
+    door_width_cm: int | None = None
     has_accessible_toilet: bool = False
     notes: str = ""
 
@@ -55,7 +55,7 @@ class AccessibilityProfile:
         if feature in self.features:
             self.features.remove(feature)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "features": [f.value for f in self.features],
             "entrance_step_height_cm": self.entrance_step_height_cm,
@@ -65,7 +65,7 @@ class AccessibilityProfile:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AccessibilityProfile":
+    def from_dict(cls, data: dict[str, Any]) -> "AccessibilityProfile":
         return cls(
             features=[AccessibilityFeature(f) for f in data.get("features", [])],
             entrance_step_height_cm=data.get("entrance_step_height_cm"),
@@ -87,7 +87,7 @@ class PointOfInterest:
     website: str = ""
     opening_hours: str = ""
     accessibility: AccessibilityProfile = field(default_factory=AccessibilityProfile)
-    owner_id: Optional[UUID] = None
+    owner_id: UUID | None = None
     is_verified: bool = False
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

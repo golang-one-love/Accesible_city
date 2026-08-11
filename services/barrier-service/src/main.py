@@ -1,36 +1,35 @@
 import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from uuid import UUID
 
-from src.config import settings
-from src.adapters.out.persistence.database import init_db, close_db
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from src.adapters.inbound.http.router import init_router
+from src.adapters.inbound.http.router import router as barriers_router
 from src.adapters.out.eventbus.redis_streams import RedisEventBus
-from src.adapters.out.storage.s3_client import S3Storage
+from src.adapters.out.persistence.database import close_db, init_db
 from src.adapters.out.persistence.repository import (
-    PostgresBarrierRepository,
-    PostgresBarrierPhotoRepository,
-    PostgresBarrierConfirmationRepository,
     PostgresBarrierComplaintRepository,
+    PostgresBarrierConfirmationRepository,
+    PostgresBarrierPhotoRepository,
+    PostgresBarrierRepository,
 )
-from src.domain.services.barrier_service import BarrierService
+from src.adapters.out.storage.s3_client import S3Storage
 from src.application.use_cases.barrier_use_cases import (
+    ApproveBarrierUseCase,
+    ComplainBarrierUseCase,
+    ConfirmBarrierUseCase,
     CreateBarrierUseCase,
     GetBarrierUseCase,
     ListBarriersUseCase,
-    UploadPhotoUseCase,
-    ConfirmBarrierUseCase,
-    ComplainBarrierUseCase,
-    ApproveBarrierUseCase,
     RejectBarrierUseCase,
     ResolveBarrierUseCase,
+    UploadPhotoUseCase,
 )
-from src.adapters.inbound.http.router import router as barriers_router, init_router
-
+from src.config import settings
+from src.domain.services.barrier_service import BarrierService
 
 event_bus = RedisEventBus()
 photo_storage = S3Storage()

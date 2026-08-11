@@ -1,24 +1,34 @@
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
 from uuid import UUID
 
-from src.domain.entities.barrier import Barrier, BarrierType, BarrierStatus, Severity, BarrierPhoto, BarrierConfirmation, BarrierComplaint
-from src.domain.value_objects.coordinates import Coordinates
-from src.domain.repositories import BarrierRepository, BarrierPhotoRepository, BarrierConfirmationRepository, BarrierComplaintRepository, PhotoStorage, EventBus
-from src.domain.services.barrier_service import BarrierService
 from src.application.dto.schemas import (
-    CreateBarrierRequest,
-    BarrierResponse,
     BarrierListResponse,
-    UploadPhotoResponse,
-    ConfirmBarrierResponse,
+    BarrierPhotoResponse,
+    BarrierResponse,
+    BarrierStatusStr,
+    BarrierTypeStr,
     ComplainBarrierRequest,
     ComplainBarrierResponse,
+    ConfirmBarrierResponse,
     CoordinatesDTO,
-    BarrierTypeStr,
-    BarrierStatusStr,
+    CreateBarrierRequest,
     SeverityInt,
+    UploadPhotoResponse,
 )
+from src.domain.entities.barrier import (
+    Barrier,
+    BarrierStatus,
+    BarrierType,
+    Severity,
+)
+from src.domain.repositories import (
+    BarrierComplaintRepository,
+    BarrierConfirmationRepository,
+    BarrierPhotoRepository,
+    PhotoStorage,
+)
+from src.domain.services.barrier_service import BarrierService
+from src.domain.value_objects.coordinates import Coordinates
 
 
 class BarrierNotFoundError(Exception):
@@ -89,7 +99,7 @@ class GetBarrierUseCase:
 
         photo_responses = []
         for photo in photos:
-            presigned_url = await self.photo_storage.generate_presigned_url(photo.s3_key)
+            await self.photo_storage.generate_presigned_url(photo.s3_key)
             photo_responses.append(BarrierPhotoResponse(
                 id=photo.id,
                 barrier_id=photo.barrier_id,
@@ -126,11 +136,11 @@ class ListBarriersUseCase:
 
     async def execute(
         self,
-        status: Optional[BarrierStatusStr] = None,
-        type: Optional[BarrierTypeStr] = None,
-        severity_min: Optional[SeverityInt] = None,
-        severity_max: Optional[SeverityInt] = None,
-        bounds: Optional[Tuple[CoordinatesDTO, CoordinatesDTO]] = None,
+        status: BarrierStatusStr | None = None,
+        type: BarrierTypeStr | None = None,
+        severity_min: SeverityInt | None = None,
+        severity_max: SeverityInt | None = None,
+        bounds: tuple[CoordinatesDTO, CoordinatesDTO] | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> BarrierListResponse:

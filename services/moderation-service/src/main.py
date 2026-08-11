@@ -1,25 +1,25 @@
 import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.config import settings
-from src.adapters.out.persistence.database import init_db, close_db
+from src.adapters.inbound.http.router import init_router
+from src.adapters.inbound.http.router import router as moderation_router
 from src.adapters.out.eventbus.redis_streams import RedisEventBus
+from src.adapters.out.persistence.database import close_db, init_db
 from src.adapters.out.persistence.repository import PostgresModerationRepository
-from src.domain.services.moderation_service import ModerationService
 from src.application.use_cases.moderation_use_cases import (
+    ApproveRequestUseCase,
     GetQueueUseCase,
     GetRequestUseCase,
-    ApproveRequestUseCase,
     RejectRequestUseCase,
 )
-from src.adapters.inbound.http.router import router as moderation_router, init_router
+from src.config import settings
 from src.domain.events import BarrierCreated
-from uuid import UUID
-
+from src.domain.services.moderation_service import ModerationService
 
 event_bus = RedisEventBus()
 moderation_repo = PostgresModerationRepository()

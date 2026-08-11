@@ -1,31 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional
+from typing import cast
 from uuid import UUID
 
-from src.application.use_cases.moderation_use_cases import (
-    GetQueueUseCase,
-    GetRequestUseCase,
-    ApproveRequestUseCase,
-    RejectRequestUseCase,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from src.adapters.inbound.http.security import get_current_user_id
 from src.application.dto.schemas import (
-    ModerationQueueResponse,
-    ModerationRequestResponse,
+    ErrorResponse,
     ModerationActionRequest,
     ModerationActionResponse,
-    ErrorResponse,
+    ModerationQueueResponse,
+    ModerationRequestResponse,
     ModerationStatusStr,
 )
+from src.application.use_cases.moderation_use_cases import (
+    ApproveRequestUseCase,
+    GetQueueUseCase,
+    GetRequestUseCase,
+    RejectRequestUseCase,
+)
 from src.domain.entities.moderation import ModerationStatus
-from src.adapters.inbound.http.security import get_current_user_id
-
 
 router = APIRouter(prefix="/api/v1/moderation", tags=["moderation"])
 
-get_queue_uc: GetQueueUseCase = None
-get_request_uc: GetRequestUseCase = None
-approve_request_uc: ApproveRequestUseCase = None
-reject_request_uc: RejectRequestUseCase = None
+get_queue_uc = cast(GetQueueUseCase, None)
+get_request_uc = cast(GetRequestUseCase, None)
+approve_request_uc = cast(ApproveRequestUseCase, None)
+reject_request_uc = cast(RejectRequestUseCase, None)
 
 
 def init_router(
@@ -47,12 +47,12 @@ def init_router(
     responses={401: {"model": ErrorResponse}},
 )
 async def get_queue(
-    status: Optional[ModerationStatusStr] = None,
+    filter_status: ModerationStatusStr | None = Query(default=None, alias="status"),
     limit: int = 50,
     offset: int = 0,
     moderator_id: UUID = Depends(get_current_user_id),
 ):
-    mod_status = ModerationStatus(status.value) if status else None
+    mod_status = ModerationStatus(filter_status.value) if filter_status else None
     try:
         return await get_queue_uc.execute(status=mod_status, limit=limit, offset=offset)
     except ValueError as e:

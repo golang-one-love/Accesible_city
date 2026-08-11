@@ -1,7 +1,6 @@
-from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List
+from enum import Enum
 from uuid import UUID, uuid4
 
 from ..value_objects.coordinates import Coordinates
@@ -34,18 +33,18 @@ class Severity(int, Enum):
 
 @dataclass
 class Barrier:
+    coordinates: Coordinates
     id: UUID = field(default_factory=uuid4)
     type: BarrierType = BarrierType.HIGH_CURB
-    coordinates: Coordinates = None
     description: str = ""
     severity: Severity = Severity.MEDIUM
     status: BarrierStatus = BarrierStatus.PENDING
-    reporter_id: Optional[UUID] = None
-    moderator_id: Optional[UUID] = None
+    reporter_id: UUID | None = None
+    moderator_id: UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    approved_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    approved_at: datetime | None = None
+    resolved_at: datetime | None = None
 
     def approve(self, moderator_id: UUID) -> None:
         if self.status != BarrierStatus.PENDING:
@@ -79,27 +78,27 @@ class Barrier:
 @dataclass
 class BarrierPhoto:
     id: UUID = field(default_factory=uuid4)
-    barrier_id: UUID = None
+    barrier_id: UUID | None = None
     s3_key: str = ""
     original_filename: str = ""
     content_type: str = ""
     size_bytes: int = 0
-    uploaded_by: UUID = None
+    uploaded_by: UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
 class BarrierConfirmation:
     id: UUID = field(default_factory=uuid4)
-    barrier_id: UUID = None
-    user_id: UUID = None
+    barrier_id: UUID | None = None
+    user_id: UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
 class BarrierComplaint:
     id: UUID = field(default_factory=uuid4)
-    barrier_id: UUID = None
-    user_id: UUID = None
+    barrier_id: UUID | None = None
+    user_id: UUID | None = None
     reason: str = ""
     created_at: datetime = field(default_factory=datetime.utcnow)

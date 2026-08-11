@@ -1,12 +1,11 @@
-from typing import Optional, List
 from uuid import UUID
-from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import func, select
+
+from src.adapters.out.persistence.database import async_session_factory
+from src.adapters.out.persistence.models import ModerationRequestModel
 from src.domain.entities.moderation import ModerationRequest, ModerationStatus
 from src.domain.repositories import ModerationRepository
-from src.adapters.out.persistence.models import ModerationRequestModel
-from src.adapters.out.persistence.database import async_session_factory
 
 
 class PostgresModerationRepository(ModerationRepository):
@@ -18,7 +17,7 @@ class PostgresModerationRepository(ModerationRepository):
             await session.refresh(model)
             return self._to_entity(model)
 
-    async def get_by_id(self, request_id: UUID) -> Optional[ModerationRequest]:
+    async def get_by_id(self, request_id: UUID) -> ModerationRequest | None:
         async with async_session_factory() as session:
             stmt = select(ModerationRequestModel).where(ModerationRequestModel.id == request_id)
             result = await session.execute(stmt)
@@ -27,7 +26,7 @@ class PostgresModerationRepository(ModerationRepository):
                 return self._to_entity(model)
             return None
 
-    async def get_by_barrier_id(self, barrier_id: UUID) -> Optional[ModerationRequest]:
+    async def get_by_barrier_id(self, barrier_id: UUID) -> ModerationRequest | None:
         async with async_session_factory() as session:
             stmt = select(ModerationRequestModel).where(ModerationRequestModel.barrier_id == barrier_id)
             result = await session.execute(stmt)
@@ -42,7 +41,7 @@ class PostgresModerationRepository(ModerationRepository):
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             if not model:
-                return None
+                raise ValueError("Moderation request not found")
             self._update_model(model, request)
             await session.commit()
             await session.refresh(model)
@@ -50,10 +49,10 @@ class PostgresModerationRepository(ModerationRepository):
 
     async def list(
         self,
-        status: Optional[ModerationStatus] = None,
+        status: ModerationStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[ModerationRequest]:
+    ) -> list[ModerationRequest]:
         async with async_session_factory() as session:
             stmt = select(ModerationRequestModel)
             if status:
@@ -62,7 +61,7 @@ class PostgresModerationRepository(ModerationRepository):
             result = await session.execute(stmt)
             return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count(self, status: Optional[ModerationStatus] = None) -> int:
+    async def count(self, status: ModerationStatus | None = None) -> int:
         async with async_session_factory() as session:
             stmt = select(func.count(ModerationRequestModel.id))
             if status:

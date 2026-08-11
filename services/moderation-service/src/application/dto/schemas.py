@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class ModerationStatusStr(str, Enum):
@@ -16,18 +16,18 @@ class ModerationRequestResponse(BaseModel):
     barrier_id: UUID
     reporter_id: UUID
     status: ModerationStatusStr
-    moderator_id: Optional[UUID]
+    moderator_id: UUID | None
     moderator_comment: str
     created_at: datetime
     updated_at: datetime
-    reviewed_at: Optional[datetime]
+    reviewed_at: datetime | None
 
     class Config:
         from_attributes = True
 
 
 class ModerationQueueResponse(BaseModel):
-    requests: List[ModerationRequestResponse]
+    requests: list[ModerationRequestResponse]
     total: int
     limit: int
     offset: int
@@ -47,4 +47,4 @@ class ModerationActionResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None

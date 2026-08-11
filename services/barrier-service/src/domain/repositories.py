@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple
 from uuid import UUID
 
-from .entities.barrier import Barrier, BarrierPhoto, BarrierConfirmation, BarrierComplaint, BarrierType, BarrierStatus, Severity
+from .entities.barrier import (
+    Barrier,
+    BarrierComplaint,
+    BarrierConfirmation,
+    BarrierPhoto,
+    BarrierStatus,
+    BarrierType,
+    Severity,
+)
 from .value_objects.coordinates import Coordinates
 
 
@@ -12,11 +19,11 @@ class BarrierRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_id(self, barrier_id: UUID) -> Optional[Barrier]:
+    async def get_by_id(self, barrier_id: UUID) -> Barrier | None:
         pass
 
     @abstractmethod
-    async def get_by_ids(self, barrier_ids: List[UUID]) -> List[Barrier]:
+    async def get_by_ids(self, barrier_ids: list[UUID]) -> list[Barrier]:
         pass
 
     @abstractmethod
@@ -26,21 +33,21 @@ class BarrierRepository(ABC):
     @abstractmethod
     async def list(
         self,
-        status: Optional[BarrierStatus] = None,
-        type: Optional[BarrierType] = None,
-        severity_min: Optional[Severity] = None,
-        severity_max: Optional[Severity] = None,
-        bounds: Optional[Tuple[Coordinates, Coordinates]] = None,
+        status: BarrierStatus | None = None,
+        type: BarrierType | None = None,
+        severity_min: Severity | None = None,
+        severity_max: Severity | None = None,
+        bounds: tuple[Coordinates, Coordinates] | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Barrier]:
+    ) -> list[Barrier]:
         pass
 
     @abstractmethod
     async def count(
         self,
-        status: Optional[BarrierStatus] = None,
-        type: Optional[BarrierType] = None,
+        status: BarrierStatus | None = None,
+        type: BarrierType | None = None,
     ) -> int:
         pass
 
@@ -51,11 +58,11 @@ class BarrierPhotoRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_barrier_id(self, barrier_id: UUID) -> List[BarrierPhoto]:
+    async def get_by_barrier_id(self, barrier_id: UUID) -> list[BarrierPhoto]:
         pass
 
     @abstractmethod
-    async def get_by_id(self, photo_id: UUID) -> Optional[BarrierPhoto]:
+    async def get_by_id(self, photo_id: UUID) -> BarrierPhoto | None:
         pass
 
     @abstractmethod

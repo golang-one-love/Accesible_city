@@ -1,9 +1,8 @@
 ﻿from functools import lru_cache
-from typing import Optional
 from uuid import UUID
 
-from fastapi import HTTPException, Header, status
-from jose import jwt, JWTError
+from fastapi import Header, HTTPException, status
+from jose import JWTError, jwt
 
 from src.config import settings
 
@@ -49,7 +48,7 @@ def get_current_user_id(authorization: str = Header(None)) -> UUID:
         )
 
 
-def get_current_user_id_optional(authorization: str = Header(None)) -> Optional[UUID]:
+def get_current_user_id_optional(authorization: str = Header(None)) -> UUID | None:
     if not authorization:
         return None
     parts = authorization.split()

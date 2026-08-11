@@ -1,11 +1,12 @@
+
 import boto3
 from botocore.config import Config
-from typing import Optional
 
 from src.config import settings
+from src.domain.repositories import PhotoStorage
 
 
-class S3Storage:
+class S3Storage(PhotoStorage):
     def __init__(self):
         self.client = boto3.client(
             "s3",

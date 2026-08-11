@@ -1,37 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional
+from typing import cast
 from uuid import UUID
 
-from src.application.use_cases.poi_use_cases import (
-    CreatePOIUseCase,
-    GetPOIUseCase,
-    UpdatePOIUseCase,
-    DeletePOIUseCase,
-    ListPOIsUseCase,
-    SearchNearbyUseCase,
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from src.adapters.inbound.http.security import (
+    get_current_user_id,
+    get_current_user_id_optional,
 )
 from src.application.dto.schemas import (
+    AccessibilityFeatureStr,
     CreatePOIRequest,
-    UpdatePOIRequest,
-    POIResponse,
-    POIListResponse,
-    SearchNearbyRequest,
     ErrorResponse,
     POICategoryStr,
-    AccessibilityFeatureStr,
+    POIListResponse,
+    POIResponse,
+    SearchNearbyRequest,
+    UpdatePOIRequest,
 )
-from src.domain.entities.poi import POICategory, AccessibilityFeature
-from src.adapters.inbound.http.security import get_current_user_id, get_current_user_id_optional
-
+from src.application.use_cases.poi_use_cases import (
+    CreatePOIUseCase,
+    DeletePOIUseCase,
+    GetPOIUseCase,
+    ListPOIsUseCase,
+    SearchNearbyUseCase,
+    UpdatePOIUseCase,
+)
 
 router = APIRouter(prefix="/api/v1/poi", tags=["poi"])
 
-create_poi_uc: CreatePOIUseCase = None
-get_poi_uc: GetPOIUseCase = None
-update_poi_uc: UpdatePOIUseCase = None
-delete_poi_uc: DeletePOIUseCase = None
-list_pois_uc: ListPOIsUseCase = None
-search_nearby_uc: SearchNearbyUseCase = None
+create_poi_uc = cast(CreatePOIUseCase, None)
+get_poi_uc = cast(GetPOIUseCase, None)
+update_poi_uc = cast(UpdatePOIUseCase, None)
+delete_poi_uc = cast(DeletePOIUseCase, None)
+list_pois_uc = cast(ListPOIsUseCase, None)
+search_nearby_uc = cast(SearchNearbyUseCase, None)
 
 
 def init_router(
@@ -112,18 +114,18 @@ async def delete_poi(poi_id: UUID, owner_id: UUID = Depends(get_current_user_id)
     response_model=POIListResponse,
 )
 async def list_pois(
-    category: Optional[POICategoryStr] = None,
-    sw_lat: Optional[float] = None,
-    sw_lon: Optional[float] = None,
-    ne_lat: Optional[float] = None,
-    ne_lon: Optional[float] = None,
-    features: Optional[list[AccessibilityFeatureStr]] = None,
-    owner_id: Optional[UUID] = Depends(get_current_user_id_optional),
+    category: POICategoryStr | None = None,
+    sw_lat: float | None = None,
+    sw_lon: float | None = None,
+    ne_lat: float | None = None,
+    ne_lon: float | None = None,
+    features: list[AccessibilityFeatureStr] | None = None,
+    owner_id: UUID | None = Depends(get_current_user_id_optional),
     limit: int = 50,
     offset: int = 0,
 ):
     bounds = None
-    if all(v is not None for v in [sw_lat, sw_lon, ne_lat, ne_lon]):
+    if sw_lat is not None and sw_lon is not None and ne_lat is not None and ne_lon is not None:
         bounds = ((sw_lat, sw_lon), (ne_lat, ne_lon))
     
     try:

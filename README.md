@@ -13,12 +13,14 @@
 
 ## Быстрый старт
 
-```bash
-# 1. Переменные окружения (скопировать из примера и при необходимости поправить)
-cp .env.example .env
+Все команды выполняются в **PowerShell / bash**. Нужен только Docker (Go, Node и `make` на машине не требуются — ключи и образы готовятся контейнерами).
 
-# 2. Сгенерировать ключи JWT (RS256)
-go run generate_keys.go
+```powershell
+# 1. Переменные окружения (скопировать из примера)
+Copy-Item .env.example .env
+
+# 2. Сгенерировать ключи JWT (RS256) — Docker вместо локального Go
+docker run --rm -v "${PWD}:/src" -w /src golang:1.22-alpine go run generate_keys.go
 
 # 3. Поднять весь стек
 docker compose -p accessible-path up -d --build
@@ -28,15 +30,17 @@ docker compose -p accessible-path up -d --build
 # Swagger (Python-сервисы): http://localhost/api/{barriers|moderation|poi}/docs
 ```
 
-> **Windows:** проект «-p accessible-path» обязателен, если путь к репозиторию содержит кириллицу (`D:\Андрей\...`), — иначе имя проекта по умолчанию генерируется из максимально валидной версии пути и расходится с `docker compose ps`/`docker logs`.
+> Приложение запускается из меню Docker Desktop (или `docker compose up -d`). Убедитесь, что Docker Desktop запущен заранее.
 
-Готовые команды: `make up`, `make down`, `make logs`, `make ps`, `make build`, `make test`, `make lint`.
+> **Windows:** проект «-p accessible-path» обязателен, если путь к репозиторию содержит кириллицу (`D:\Андрей\...`) — иначе имя проекта по умолчанию генерируется из пути и расходится с `docker compose ps`/`docker logs`.
+
+`Makefile` и команды `make up`/`make logs` и т.п. — опциональны, требуют GNU Make (доступен в Git Bash/Unix). Эквиваленты: `docker compose -p accessible-path ps`, `docker compose -p accessible-path logs -f <service>`.
 
 ## Первый запуск / полезные операции
 
 - **Схема БД** создаётся автоматически при старте сервиса (`SQLAlchemy create_all` в Python-сервисах, `EnsureSchema` в Go-сервисах). `infra/postgres/init.sql` создаёт только БД и роли. Отдельные миграции не нужны.
 - **Перезапуск бэкенд-контейнера:** после `docker compose ... restart <svc>` nginx может отдавать 502 (stale keepalive-соединения). Решение: `docker restart accessible-path-nginx`.
-- **Ключи JWT:** только auth-service держит приватный ключ; остальные сервисы проверяют подпись публичным ключом, смонтированным в `/keys` (см. `.env` → `JWT_PUBLIC_KEY_PATH`).
+- **Ключи JWT:** только auth-service держит приватный ключ; остальные сервисы проверяют подпись публичным ключом, смонтированным в `/keys` (см. `.env` → `JWT_PUBLIC_KEY_PATH`). Генерация: команда из «Быстрого старта» (шаг 2).
 
 ## API
 

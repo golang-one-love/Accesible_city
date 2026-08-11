@@ -1,19 +1,23 @@
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
 from uuid import UUID
 
-from src.domain.entities.poi import PointOfInterest, POICategory, AccessibilityProfile, AccessibilityFeature
-from src.domain.services.poi_service import POIService
 from src.application.dto.schemas import (
-    CreatePOIRequest,
-    UpdatePOIRequest,
-    POIResponse,
-    POIListResponse,
-    SearchNearbyRequest,
-    AccessibilityProfileDTO,
-    POICategoryStr,
     AccessibilityFeatureStr,
+    AccessibilityProfileDTO,
+    CreatePOIRequest,
+    POICategoryStr,
+    POIListResponse,
+    POIResponse,
+    SearchNearbyRequest,
+    UpdatePOIRequest,
 )
+from src.domain.entities.poi import (
+    AccessibilityFeature,
+    AccessibilityProfile,
+    POICategory,
+    PointOfInterest,
+)
+from src.domain.services.poi_service import POIService
 
 
 class POINotFoundError(Exception):
@@ -24,7 +28,7 @@ class POIPermissionError(Exception):
     pass
 
 
-def _to_accessibility_profile(dto: Optional[AccessibilityProfileDTO]) -> AccessibilityProfile:
+def _to_accessibility_profile(dto: AccessibilityProfileDTO | None) -> AccessibilityProfile:
     if not dto:
         return AccessibilityProfile()
     return AccessibilityProfile(
@@ -137,10 +141,10 @@ class ListPOIsUseCase:
 
     async def execute(
         self,
-        category: Optional[POICategoryStr] = None,
-        bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
-        has_features: Optional[List[AccessibilityFeatureStr]] = None,
-        owner_id: Optional[UUID] = None,
+        category: POICategoryStr | None = None,
+        bounds: tuple[tuple[float, float], tuple[float, float]] | None = None,
+        has_features: list[AccessibilityFeatureStr] | None = None,
+        owner_id: UUID | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> POIListResponse:

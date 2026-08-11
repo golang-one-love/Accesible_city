@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
 from uuid import UUID
 
 from .entities.moderation import ModerationRequest, ModerationStatus
@@ -11,11 +10,11 @@ class ModerationRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_id(self, request_id: UUID) -> Optional[ModerationRequest]:
+    async def get_by_id(self, request_id: UUID) -> ModerationRequest | None:
         pass
 
     @abstractmethod
-    async def get_by_barrier_id(self, barrier_id: UUID) -> Optional[ModerationRequest]:
+    async def get_by_barrier_id(self, barrier_id: UUID) -> ModerationRequest | None:
         pass
 
     @abstractmethod
@@ -25,14 +24,14 @@ class ModerationRepository(ABC):
     @abstractmethod
     async def list(
         self,
-        status: Optional[ModerationStatus] = None,
+        status: ModerationStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[ModerationRequest]:
+    ) -> list[ModerationRequest]:
         pass
 
     @abstractmethod
-    async def count(self, status: Optional[ModerationStatus] = None) -> int:
+    async def count(self, status: ModerationStatus | None = None) -> int:
         pass
 
 

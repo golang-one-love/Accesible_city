@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class POICategoryStr(str, Enum):
@@ -40,9 +40,9 @@ class AccessibilityFeatureStr(str, Enum):
 
 
 class AccessibilityProfileDTO(BaseModel):
-    features: List[AccessibilityFeatureStr] = []
-    entrance_step_height_cm: Optional[int] = None
-    door_width_cm: Optional[int] = None
+    features: list[AccessibilityFeatureStr] = []
+    entrance_step_height_cm: int | None = None
+    door_width_cm: int | None = None
     has_accessible_toilet: bool = False
     notes: str = ""
 
@@ -56,17 +56,17 @@ class CreatePOIRequest(BaseModel):
     phone: str = Field(default="", max_length=50)
     website: str = Field(default="", max_length=200)
     opening_hours: str = Field(default="", max_length=200)
-    accessibility: Optional[AccessibilityProfileDTO] = None
+    accessibility: AccessibilityProfileDTO | None = None
 
 
 class UpdatePOIRequest(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    category: Optional[POICategoryStr] = None
-    address: Optional[str] = Field(default=None, max_length=500)
-    phone: Optional[str] = Field(default=None, max_length=50)
-    website: Optional[str] = Field(default=None, max_length=200)
-    opening_hours: Optional[str] = Field(default=None, max_length=200)
-    accessibility: Optional[AccessibilityProfileDTO] = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    category: POICategoryStr | None = None
+    address: str | None = Field(default=None, max_length=500)
+    phone: str | None = Field(default=None, max_length=50)
+    website: str | None = Field(default=None, max_length=200)
+    opening_hours: str | None = Field(default=None, max_length=200)
+    accessibility: AccessibilityProfileDTO | None = None
 
 
 class POIResponse(BaseModel):
@@ -80,7 +80,7 @@ class POIResponse(BaseModel):
     website: str
     opening_hours: str
     accessibility: AccessibilityProfileDTO
-    owner_id: Optional[UUID]
+    owner_id: UUID | None
     is_verified: bool
     created_at: datetime
     updated_at: datetime
@@ -90,7 +90,7 @@ class POIResponse(BaseModel):
 
 
 class POIListResponse(BaseModel):
-    pois: List[POIResponse]
+    pois: list[POIResponse]
     total: int
     limit: int
     offset: int
@@ -100,10 +100,10 @@ class SearchNearbyRequest(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     radius_meters: float = Field(gt=0, le=50000)
-    category: Optional[POICategoryStr] = None
+    category: POICategoryStr | None = None
     limit: int = Field(default=20, le=100)
 
 
 class ErrorResponse(BaseModel):
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None

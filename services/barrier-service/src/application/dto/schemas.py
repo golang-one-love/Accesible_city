@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class BarrierTypeStr(str, Enum):
@@ -63,13 +63,13 @@ class BarrierResponse(BaseModel):
     description: str
     severity: SeverityInt
     status: BarrierStatusStr
-    reporter_id: Optional[UUID]
-    moderator_id: Optional[UUID]
+    reporter_id: UUID | None
+    moderator_id: UUID | None
     created_at: datetime
     updated_at: datetime
-    approved_at: Optional[datetime]
-    resolved_at: Optional[datetime]
-    photos: List[BarrierPhotoResponse] = []
+    approved_at: datetime | None
+    resolved_at: datetime | None
+    photos: list[BarrierPhotoResponse] = []
     confirmations_count: int = 0
     complaints_count: int = 0
 
@@ -78,7 +78,7 @@ class BarrierResponse(BaseModel):
 
 
 class BarrierListResponse(BaseModel):
-    barriers: List[BarrierResponse]
+    barriers: list[BarrierResponse]
     total: int
     limit: int
     offset: int
@@ -115,4 +115,4 @@ class ComplainBarrierResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None

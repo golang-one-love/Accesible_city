@@ -1,24 +1,23 @@
-import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.config import settings
-from src.adapters.out.persistence.database import init_db, close_db
+from src.adapters.inbound.http.router import init_router
+from src.adapters.inbound.http.router import router as poi_router
+from src.adapters.out.persistence.database import close_db, init_db
 from src.adapters.out.persistence.repository import PostgresPOIRepository
-from src.domain.services.poi_service import POIService
 from src.application.use_cases.poi_use_cases import (
     CreatePOIUseCase,
-    GetPOIUseCase,
-    UpdatePOIUseCase,
     DeletePOIUseCase,
+    GetPOIUseCase,
     ListPOIsUseCase,
     SearchNearbyUseCase,
+    UpdatePOIUseCase,
 )
-from src.adapters.inbound.http.router import router as poi_router, init_router
-
+from src.config import settings
+from src.domain.services.poi_service import POIService
 
 poi_repo = PostgresPOIRepository()
 poi_service = POIService(poi_repo=poi_repo)

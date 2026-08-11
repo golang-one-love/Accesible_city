@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Tuple
 
 
 @dataclass(frozen=True)
@@ -13,11 +12,11 @@ class Coordinates:
         if not -180 <= self.longitude <= 180:
             raise ValueError("Longitude must be between -180 and 180")
 
-    def to_tuple(self) -> Tuple[float, float]:
+    def to_tuple(self) -> tuple[float, float]:
         return (self.latitude, self.longitude)
 
     def distance_to(self, other: "Coordinates") -> float:
-        from math import radians, sin, cos, sqrt, atan2
+        from math import atan2, cos, radians, sin, sqrt
         R = 6371000  # Earth radius in meters
 
         lat1, lon1 = radians(self.latitude), radians(self.longitude)
@@ -32,7 +31,7 @@ class Coordinates:
         return R * c
 
     @classmethod
-    def from_tuple(cls, coords: Tuple[float, float]) -> "Coordinates":
+    def from_tuple(cls, coords: tuple[float, float]) -> "Coordinates":
         return cls(latitude=coords[0], longitude=coords[1])
 
     def __str__(self) -> str:

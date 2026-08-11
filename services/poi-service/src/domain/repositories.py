@@ -1,8 +1,8 @@
+import builtins
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple
 from uuid import UUID
 
-from .entities.poi import PointOfInterest, POICategory, AccessibilityFeature
+from .entities.poi import AccessibilityFeature, POICategory, PointOfInterest
 
 
 class POIRepository(ABC):
@@ -11,7 +11,7 @@ class POIRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_id(self, poi_id: UUID) -> Optional[PointOfInterest]:
+    async def get_by_id(self, poi_id: UUID) -> PointOfInterest | None:
         pass
 
     @abstractmethod
@@ -25,20 +25,20 @@ class POIRepository(ABC):
     @abstractmethod
     async def list(
         self,
-        category: Optional[POICategory] = None,
-        bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
-        has_features: Optional[List[AccessibilityFeature]] = None,
-        owner_id: Optional[UUID] = None,
+        category: POICategory | None = None,
+        bounds: tuple[tuple[float, float], tuple[float, float]] | None = None,
+        has_features: list[AccessibilityFeature] | None = None,
+        owner_id: UUID | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[PointOfInterest]:
+    ) -> list[PointOfInterest]:
         pass
 
     @abstractmethod
     async def count(
         self,
-        category: Optional[POICategory] = None,
-        bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
+        category: POICategory | None = None,
+        bounds: tuple[tuple[float, float], tuple[float, float]] | None = None,
     ) -> int:
         pass
 
@@ -48,7 +48,7 @@ class POIRepository(ABC):
         latitude: float,
         longitude: float,
         radius_meters: float,
-        category: Optional[POICategory] = None,
+        category: POICategory | None = None,
         limit: int = 20,
-    ) -> List[PointOfInterest]:
+    ) -> builtins.list[PointOfInterest]:
         pass

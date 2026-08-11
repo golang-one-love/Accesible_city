@@ -1,7 +1,11 @@
-from typing import Optional, List, Tuple
 from uuid import UUID
 
-from ..entities.poi import PointOfInterest, POICategory, AccessibilityProfile, AccessibilityFeature
+from ..entities.poi import (
+    AccessibilityFeature,
+    AccessibilityProfile,
+    POICategory,
+    PointOfInterest,
+)
 from ..repositories import POIRepository
 
 
@@ -20,7 +24,7 @@ class POIService:
         phone: str = "",
         website: str = "",
         opening_hours: str = "",
-        accessibility: Optional[AccessibilityProfile] = None,
+        accessibility: AccessibilityProfile | None = None,
     ) -> PointOfInterest:
         poi = PointOfInterest(
             name=name,
@@ -36,20 +40,20 @@ class POIService:
         )
         return await self.poi_repo.create(poi)
 
-    async def get_poi(self, poi_id: UUID) -> Optional[PointOfInterest]:
+    async def get_poi(self, poi_id: UUID) -> PointOfInterest | None:
         return await self.poi_repo.get_by_id(poi_id)
 
     async def update_poi(
         self,
         poi_id: UUID,
         owner_id: UUID,
-        name: Optional[str] = None,
-        category: Optional[POICategory] = None,
-        address: Optional[str] = None,
-        phone: Optional[str] = None,
-        website: Optional[str] = None,
-        opening_hours: Optional[str] = None,
-        accessibility: Optional[AccessibilityProfile] = None,
+        name: str | None = None,
+        category: POICategory | None = None,
+        address: str | None = None,
+        phone: str | None = None,
+        website: str | None = None,
+        opening_hours: str | None = None,
+        accessibility: AccessibilityProfile | None = None,
     ) -> PointOfInterest:
         poi = await self.poi_repo.get_by_id(poi_id)
         if not poi:
@@ -85,13 +89,13 @@ class POIService:
 
     async def list_pois(
         self,
-        category: Optional[POICategory] = None,
-        bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
-        has_features: Optional[List[AccessibilityFeature]] = None,
-        owner_id: Optional[UUID] = None,
+        category: POICategory | None = None,
+        bounds: tuple[tuple[float, float], tuple[float, float]] | None = None,
+        has_features: list[AccessibilityFeature] | None = None,
+        owner_id: UUID | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[PointOfInterest]:
+    ) -> list[PointOfInterest]:
         return await self.poi_repo.list(
             category=category,
             bounds=bounds,
@@ -106,9 +110,9 @@ class POIService:
         latitude: float,
         longitude: float,
         radius_meters: float,
-        category: Optional[POICategory] = None,
+        category: POICategory | None = None,
         limit: int = 20,
-    ) -> List[PointOfInterest]:
+    ) -> list[PointOfInterest]:
         return await self.poi_repo.search_nearby(
             latitude=latitude,
             longitude=longitude,
