@@ -1,0 +1,98 @@
+# =============================================================================
+# Accessible Path - Git Ignore
+# =============================================================================
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+*.tar
+*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+bin/
+pkg/
+vendor/
+*.exe
+*.test
+*.prof
+coverage.out
+go.work
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.pip/
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.eslintcache
+
+# Frontend build
+frontend/dist/
+
+# Testcontainers
+.testcontainers/
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Keys/Certs
+*.pem
+*.key
+*.crt
+keys/
+
+# Terraform/Infrastructure (if added later)
+*.tfstate
+*.tfstate.*
+.tfplan
+.terraform/
+
+# OS/Editor temp
+*.tmp
+*.temp
+.cache/
+
+# Agent session files
+session-ses_*.md

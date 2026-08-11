@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint-and-test-go:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, route-service, notification-service]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+
+      - name: Download dependencies
+        working-directory: services/${{ matrix.service }}
+        run: go mod download
+
+      - name: Run go vet
+        working-directory: services/${{ matrix.service }}
+        run: go vet ./...
+
+      - name: Run staticcheck
+        working-directory: services/${{ matrix.service }}
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+      - name: Run tests
+        working-directory: services/${{ matrix.service }}
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/${{ matrix.service }}/coverage.out
+          flags: unittests
+          name: ${{ matrix.service }}
+
+  lint-and-test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [barrier-service, moderation-service, poi-service]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: |
+          pip install -r requirements.txt
+          pip install ruff mypy pytest pytest-asyncio pytest-cov
+
+      - name: Run ruff
+        working-directory: services/${{ matrix.service }}
+        run: ruff check src
+
+      - name: Run mypy
+        working-directory: services/${{ matrix.service }}
+        run: mypy src
+
+      - name: Run tests
+        working-directory: services/${{ matrix.service }}
+        run: pytest --cov=src --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/${{ matrix.service }}/coverage.xml
+          flags: unittests
+          name: ${{ matrix.service }}
+
+  lint-and-test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test
+
+  build-docker:
+    needs: [lint-and-test-go, lint-and-test-python, lint-and-test-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build all services
+        run: |
+          docker compose build
+
+      - name: Login to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
