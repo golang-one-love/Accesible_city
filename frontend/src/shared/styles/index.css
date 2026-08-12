@@ -1268,7 +1268,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: start;
 }
 
-.route-form-panel {
+.route-form-panel,
+.route-controls-panel {
   background: var(--color-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
@@ -1276,14 +1277,73 @@ h1, h2, h3, h4, h5, h6 {
   padding: 20px;
 }
 
-.route-form-panel .form-group:last-of-type {
+.route-form-panel .form-group:last-of-type,
+.route-controls-panel .form-group:last-of-type {
   margin-bottom: 16px;
 }
 
 .route-map-panel {
+  position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: 0 4px 16px var(--color-shadow);
+  height: 520px;
+}
+
+.route-map-panel .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.route-point-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.route-point-coords {
+  font-size: 13px;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+.route-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.route-point-marker {
+  background: transparent;
+  border: none;
+}
+
+.route-point-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+  border: 2px solid #fff;
+}
+
+.route-point-start {
+  background: #16a34a;
+}
+
+.route-point-finish {
+  background: #dc2626;
+}
+
+.route-map-panel .click-point-panel {
+  bottom: 16px;
 }
 
 .map-placeholder {

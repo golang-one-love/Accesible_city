@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
 import { Barrier, BarrierType, BarrierStatus, Severity, Coordinates } from '@entities/barrier/types'
+import { MapClickHandler } from '@shared/ui/MapClickHandler'
 import { BarrierMarker } from '@widgets/BarrierMarker'
 import { BarrierFormModal } from '@features/barriers/BarrierFormModal'
 import { RoutePanel } from '@widgets/RoutePanel'
@@ -24,19 +25,6 @@ const iconDefault = L.icon({
 L.Marker.prototype.options.icon = iconDefault
 
 const MOSCOW_CENTER = [55.7558, 37.6173] as [number, number]
-
-const roundCoord = (value: number) => Math.round(value * 1e6) / 1e6
-
-function MapClickHandler({ onMapClick }: { onMapClick: (point: Coordinates) => void }) {
-  useMapEvents({
-    click: (e) => {
-      const target = e.originalEvent.target as HTMLElement | null
-      if (target?.closest('.leaflet-marker-icon')) return
-      onMapClick({ latitude: roundCoord(e.latlng.lat), longitude: roundCoord(e.latlng.lng) })
-    },
-  })
-  return null
-}
 
 interface MapViewProps {
   selectedBarrier: Barrier | null
