@@ -193,6 +193,8 @@ services:
       - POSTGRES_PASSWORD=${ROUTE_DB_PASSWORD}
       - POSTGRES_DB=${ROUTE_DB_NAME}
       - BARRIER_SERVICE_URL=http://barrier-service:8000
+      - OSM_OVERPASS_URL=${OSM_OVERPASS_URL:-https://overpass-api.de/api/interpreter}
+      - OSM_DEFAULT_BBOX=${OSM_DEFAULT_BBOX:-55.7000,37.5200,55.8000,37.7200}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}

@@ -45,17 +45,29 @@ func main() {
 	graphCache := cache.NewMemoryGraphCache()
 	graphRepo := postgres.NewPostgresGraphRepository(pool)
 
-	graph, err := graphRepo.LoadGraph()
-	if err != nil {
-		logger.Warn("no cached graph found, creating default grid", zap.Error(err))
-		graph = createDefaultGrid()
-	}
-	graphCache.Set(graph)
-
+	osmClient := external.NewOSMClient(cfg.OSMOverpassURL)
 	barrierClient := external.NewBarrierClient(cfg.BarrierServiceURL)
 
-	router := service.NewRouter(graph, barrierClient)
-	routeUseCase := usecase.NewRouteUseCase(router)
+	router := service.NewRouter(entity.NewGraph(), barrierClient)
+	routeUseCase := usecase.NewRouteUseCase(router, graphRepo, osmClient)
+
+	graph, err := graphRepo.LoadGraph()
+	if err != nil || len(graph.Nodes) == 0 {
+		logger.Warn("no cached graph found, importing OSM roads...", zap.Error(err))
+		if impErr := routeUseCase.ImportOSM(cfg.OSMDefaultBBox); impErr != nil {
+			logger.Warn("OSM import failed, falling back to default grid", zap.Error(impErr))
+			graph = createDefaultGrid()
+		} else {
+			graph, err = graphRepo.LoadGraph()
+			if err != nil || len(graph.Nodes) == 0 {
+				logger.Warn("failed to reload imported graph, using default grid", zap.Error(err))
+				graph = createDefaultGrid()
+			}
+		}
+	}
+	router.SetGraph(graph)
+	graphCache.Set(graph)
+
 	routeHandler := httpapiv1.NewRouteHandler(routeUseCase)
 
 	e := echo.New()
@@ -94,13 +106,15 @@ func main() {
 }
 
 type config struct {
-	Port               string
-	PostgresHost       string
-	PostgresPort       string
-	PostgresUser       string
-	PostgresPassword   string
-	PostgresDB         string
-	BarrierServiceURL  string
+	Port             string
+	PostgresHost     string
+	PostgresPort     string
+	PostgresUser     string
+	PostgresPassword string
+	PostgresDB       string
+	BarrierServiceURL string
+	OSMOverpassURL   string
+	OSMDefaultBBox   string
 }
 
 func loadConfig() config {
@@ -112,6 +126,8 @@ func loadConfig() config {
 		PostgresPassword:  getEnv("POSTGRES_PASSWORD", "route_pass"),
 		PostgresDB:        getEnv("POSTGRES_DB", "route_db"),
 		BarrierServiceURL: getEnv("BARRIER_SERVICE_URL", "http://barrier-service:8000"),
+		OSMOverpassURL:    getEnv("OSM_OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
+		OSMDefaultBBox:    getEnv("OSM_DEFAULT_BBOX", "55.7000,37.5200,55.8000,37.7200"),
 	}
 }
 

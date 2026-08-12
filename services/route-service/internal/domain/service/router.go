@@ -27,6 +27,10 @@ func NewRouter(graph *entity.Graph, barrierRepo out.BarrierProvider) *Router {
 	}
 }
 
+func (r *Router) SetGraph(graph *entity.Graph) {
+	r.graph = graph
+}
+
 func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entity.MobilityProfile) (*entity.Route, error) {
 	if !profile.IsValid() {
 		return nil, ErrInvalidProfile
