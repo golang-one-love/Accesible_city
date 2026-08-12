@@ -28,19 +28,20 @@ const severityColors: Record<Severity, string> = {
 }
 
 export function BarrierMarker({ barrier, isSelected, onClick }: BarrierMarkerProps) {
-  const icon = barrierTypeIcons[barrier.type] || '📍'
-  const color = severityColors[barrier.severity] || '#64748b'
-  const size = 24 + barrier.severity * 4
+  const isPending = barrier.status === 'pending'
+  const icon = isPending ? '❗' : barrierTypeIcons[barrier.type] || '📍'
+  const color = isPending ? '#eab308' : severityColors[barrier.severity] || '#64748b'
+  const size = isPending ? 30 : 24 + barrier.severity * 4
 
   const divIcon = useMemo(() => {
     return L.divIcon({
-      className: `barrier-marker ${isSelected ? 'selected' : ''}`,
+      className: `barrier-marker ${isPending ? 'pending' : ''} ${isSelected ? 'selected' : ''}`,
       html: `<span class="marker-icon" style="width:${size}px;height:${size}px;border:3px solid ${color};background:var(--color-card);font-size:${Math.round(size * 0.5)}px">${icon}</span>${isSelected ? `<span class="marker-pulse" style="border-color:${color}"></span>` : ''}`,
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
       popupAnchor: [0, -size / 2],
     })
-  }, [icon, color, size, isSelected])
+  }, [icon, color, size, isSelected, isPending])
 
   return (
     <Marker

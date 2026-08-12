@@ -99,7 +99,7 @@ class GetBarrierUseCase:
 
         photo_responses = []
         for photo in photos:
-            await self.photo_storage.generate_presigned_url(photo.s3_key)
+            presigned_url = await self.photo_storage.generate_presigned_url(photo.s3_key)
             photo_responses.append(BarrierPhotoResponse(
                 id=photo.id,
                 barrier_id=photo.barrier_id,
@@ -109,6 +109,7 @@ class GetBarrierUseCase:
                 size_bytes=photo.size_bytes,
                 uploaded_by=photo.uploaded_by,
                 created_at=photo.created_at,
+                presigned_url=presigned_url,
             ))
 
         return BarrierResponse(

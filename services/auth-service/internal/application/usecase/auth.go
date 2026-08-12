@@ -49,3 +49,19 @@ func (u *authUseCase) UpdateUserRole(actorID string, actorRole entity.Role, user
 func (u *authUseCase) ListUsers() ([]*entity.User, error) {
 	return u.authService.ListUsers()
 }
+
+func (u *authUseCase) SelfPromote(userID string, role entity.Role) (*entity.User, error) {
+	return u.authService.SelfPromote(userID, role)
+}
+
+func (u *authUseCase) ApplyForRole(userID string, requestedRole entity.Role, comment string) (*entity.RoleApplication, error) {
+	return u.authService.ApplyForRole(userID, requestedRole, comment)
+}
+
+func (u *authUseCase) ListApplications(actorRole entity.Role) ([]*entity.RoleApplication, error) {
+	return u.authService.ListApplications(actorRole)
+}
+
+func (u *authUseCase) ReviewApplication(actorID string, actorRole entity.Role, applicationID string, approve bool) (*entity.RoleApplication, error) {
+	return u.authService.ReviewApplication(actorID, actorRole, applicationID, approve)
+}

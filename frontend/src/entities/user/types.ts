@@ -35,3 +35,15 @@ export interface ValidateResponse {
   role: string
   exp: number
 }
+
+export type RoleApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface RoleApplication {
+  id: string
+  user_id: string
+  requested_role: UserRole
+  comment: string
+  status: RoleApplicationStatus
+  created_at: string
+  reviewed_at: string
+}

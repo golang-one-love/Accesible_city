@@ -18,6 +18,15 @@ type UpdateRoleRequest struct {
 	Role string `json:"role" validate:"required,oneof=user volunteer moderator business_owner admin"`
 }
 
+type SelfPromoteRequest struct {
+	Role string `json:"role" validate:"required,oneof=volunteer"`
+}
+
+type ApplyRoleRequest struct {
+	Role    string `json:"role" validate:"required,oneof=volunteer moderator"`
+	Comment string `json:"comment"`
+}
+
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
@@ -44,6 +53,20 @@ type UserResponse struct {
 
 type UsersResponse struct {
 	Users []UserResponse `json:"users"`
+}
+
+type RoleApplicationResponse struct {
+	ID            string `json:"id"`
+	UserID        string `json:"user_id"`
+	RequestedRole string `json:"requested_role"`
+	Comment       string `json:"comment"`
+	Status        string `json:"status"`
+	CreatedAt     string `json:"created_at"`
+	ReviewedAt    string `json:"reviewed_at"`
+}
+
+type ApplicationsResponse struct {
+	Applications []RoleApplicationResponse `json:"applications"`
 }
 
 type TokenResponse struct {

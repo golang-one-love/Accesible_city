@@ -54,6 +54,7 @@ func main() {
 	}
 
 	userRepo := postgres.NewUserRepository(pool)
+	roleAppRepo := postgres.NewRoleApplicationRepository(pool)
 
 	if err := seedModerator(userRepo, logger, cfg); err != nil {
 		logger.Fatal("failed to seed moderator", zap.Error(err))
@@ -61,6 +62,7 @@ func main() {
 
 	authService := service.NewAuthService(
 		userRepo,
+		roleAppRepo,
 		tokenGen,
 		cfg.BCryptCost,
 		cfg.JWTAccessTTL,

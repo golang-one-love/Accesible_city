@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserRole } from '@entities/user/types'
+import { UserRole, RoleApplication } from '@entities/user/types'
 import { useAuthStore } from '@features/auth/store'
 import { api } from '@shared/api/axios'
 
@@ -70,6 +70,7 @@ function UserRow({ userEntry, canAssignAdmin }: { userEntry: AdminUser; canAssig
 export function ProfilePage() {
   const user = useAuthStore((state) => state.user)
   const updateUser = useAuthStore((state) => state.updateUser)
+  const queryClient = useQueryClient()
 
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [profileAlert, setProfileAlert] = useState<Alert>(null)
@@ -251,7 +252,177 @@ export function ProfilePage() {
             )}
           </div>
         )}
+
+        <RoleSelfService user={user} updateUser={updateUser} />
+
+        {canManageUsers && <ApplicationsSection queryClient={queryClient} />}
       </div>
+    </div>
+  )
+}
+
+function RoleSelfService({ user, updateUser }: {
+  user: { role: string }
+  updateUser: (patch: Partial<{ role: string }>) => void
+}) {
+  const [applyOpen, setApplyOpen] = useState(false)
+  const [applyComment, setApplyComment] = useState('')
+  const [alert, setAlert] = useState<Alert>(null)
+
+  const canBecomeVolunteer = user.role === 'user'
+  const canApplyModerator = user.role === 'user' || user.role === 'volunteer'
+
+  const promoteMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/auth/self-promote', { role: 'volunteer' })
+      return response.data
+    },
+    onSuccess: (data) => {
+      updateUser(data)
+      setAlert({ type: 'success', text: 'Вы стали активным пользователем' })
+    },
+    onError: () => {
+      setAlert({ type: 'error', text: 'Не удалось сменить роль' })
+    },
+  })
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/auth/apply', { role: 'moderator', comment: applyComment })
+      return response.data
+    },
+    onSuccess: (data: RoleApplication) => {
+      setApplyOpen(false)
+      setApplyComment('')
+      setAlert({ type: 'success', text: `Заявка на модератора отправлена (#${data.id.slice(0, 8)})` })
+    },
+    onError: (err: any) => {
+      setAlert({ type: 'error', text: err.response?.data?.error || 'Не удалось отправить заявку' })
+    },
+  })
+
+  if (!canBecomeVolunteer && !canApplyModerator) return null
+
+  return (
+    <div className="profile-section">
+      <h2 className="profile-title">Роль</h2>
+      {canBecomeVolunteer && (
+        <div className="role-selfservice-item">
+          <p className="role-selfservice-text">
+            Активные пользователи помогают проверять точки на карте: подтверждают или опровергают барьеры.
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => promoteMutation.mutate()}
+            disabled={promoteMutation.isPending}
+          >
+            {promoteMutation.isPending ? 'Сохранение...' : 'Стать активным пользователем'}
+          </button>
+        </div>
+      )}
+      {canApplyModerator && (
+        <div className="role-selfservice-item">
+          <p className="role-selfservice-text">
+            Модераторы проверяют заявки на барьеры и фотографии.
+          </p>
+          {!applyOpen ? (
+            <button className="btn btn-secondary" onClick={() => setApplyOpen(true)}>
+              Подать заявку на модератора
+            </button>
+          ) : (
+            <div className="role-apply-form">
+              <textarea
+                className="form-input"
+                rows={3}
+                value={applyComment}
+                onChange={(e) => setApplyComment(e.target.value)}
+                placeholder="Почему вы хотите стать модератором?"
+              />
+              <div className="modal-actions">
+                <button className="btn btn-secondary btn-sm" onClick={() => setApplyOpen(false)}>Отмена</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => applyMutation.mutate()}
+                  disabled={applyMutation.isPending}
+                >
+                  {applyMutation.isPending ? 'Отправка...' : 'Отправить заявку'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {alert && <div className={`alert-${alert.type}`}>{alert.text}</div>}
+    </div>
+  )
+}
+
+function ApplicationsSection({ queryClient }: { queryClient: ReturnType<typeof useQueryClient> }) {
+  const applicationsQuery = useQuery({
+    queryKey: ['role-applications'],
+    queryFn: async () => {
+      const response = await api.get('/auth/applications')
+      return response.data.applications as RoleApplication[]
+    },
+  })
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
+      const response = await api.post(`/auth/applications/${id}/${approve ? 'approve' : 'reject'}`)
+      return response.data
+    },
+    onSuccess: () => {
+      applicationsQuery.refetch()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+
+  const getStatusLabel = (status: string) => ({
+    pending: 'На рассмотрении',
+    approved: 'Одобрена',
+    rejected: 'Отклонена',
+  }[status] || status)
+
+  return (
+    <div className="profile-section">
+      <h2 className="profile-title">Заявки на роли</h2>
+      {applicationsQuery.isLoading ? (
+        <div className="spinner" />
+      ) : applicationsQuery.isError ? (
+        <div className="alert-error">Ошибка загрузки заявок</div>
+      ) : applicationsQuery.data?.length === 0 ? (
+        <div className="empty-state"><p>Заявок нет</p></div>
+      ) : (
+        <div className="users-table">
+          {applicationsQuery.data?.map((app) => (
+            <div key={app.id} className="users-row">
+              <div className="users-info">
+                <span className="users-email">{app.requested_role}</span>
+                <span className="users-nickname">{app.user_id.slice(0, 8)} — {app.comment || 'без комментария'}</span>
+              </div>
+              <span className="role-badge">{getStatusLabel(app.status)}</span>
+              {app.status === 'pending' && (
+                <div className="request-actions">
+                  <button
+                    className="btn btn-success btn-sm"
+                    onClick={() => reviewMutation.mutate({ id: app.id, approve: true })}
+                    disabled={reviewMutation.isPending}
+                  >
+                    Одобрить
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => reviewMutation.mutate({ id: app.id, approve: false })}
+                    disabled={reviewMutation.isPending}
+                  >
+                    Отклонить
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

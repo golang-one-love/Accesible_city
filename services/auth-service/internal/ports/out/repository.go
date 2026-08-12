@@ -13,6 +13,14 @@ type UserRepository interface {
 	List() ([]*entity.User, error)
 }
 
+type RoleApplicationRepository interface {
+	Create(app *entity.RoleApplication) error
+	GetByID(id string) (*entity.RoleApplication, error)
+	ListByUser(userID string) ([]*entity.RoleApplication, error)
+	List() ([]*entity.RoleApplication, error)
+	Update(app *entity.RoleApplication) error
+}
+
 type TokenGenerator interface {
 	GenerateAccessToken(user *entity.User) (string, error)
 	GenerateRefreshToken(user *entity.User) (string, error)
