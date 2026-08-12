@@ -2,7 +2,23 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
 import { ModerationRequest, ModerationStatus } from '@entities/moderation/types'
-import { Barrier } from '@entities/barrier/types'
+import { Barrier, BarrierPhoto } from '@entities/barrier/types'
+
+function PhotoLightbox({ photo, onClose }: { photo: BarrierPhoto; onClose: () => void }) {
+  return (
+    <div className="photo-lightbox" onClick={onClose}>
+      <button className="photo-lightbox-close" aria-label="Закрыть" onClick={onClose}>
+        ✕
+      </button>
+      <img
+        src={photo.presigned_url}
+        alt={photo.original_filename}
+        className="photo-lightbox-image"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  )
+}
 
 function useBarrier(barrierId: string | null) {
   return useQuery({
@@ -18,6 +34,7 @@ function useBarrier(barrierId: string | null) {
 function ModerationCard({ request, onReviewed }: { request: ModerationRequest; onReviewed: () => void }) {
   const { data: barrier, isLoading } = useBarrier(request.barrier_id)
   const [comment, setComment] = useState('')
+  const [viewingPhoto, setViewingPhoto] = useState<BarrierPhoto | null>(null)
 
   const destroy = () => {
     setComment('')
@@ -58,11 +75,16 @@ function ModerationCard({ request, onReviewed }: { request: ModerationRequest; o
                   src={photo.presigned_url}
                   alt={photo.original_filename}
                   className="moderation-photo"
+                  onClick={() => setViewingPhoto(photo)}
                 />
               ))}
             </div>
           ) : (
             <p className="empty-state">Фотографии не приложены</p>
+          )}
+
+          {viewingPhoto && (
+            <PhotoLightbox photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />
           )}
 
           {request.status === 'pending' && (

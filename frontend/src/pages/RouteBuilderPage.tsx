@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet'
+import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMutation } from '@tanstack/react-query'
@@ -30,8 +30,25 @@ const finishIcon = L.divIcon({
   iconAnchor: [15, 15],
 })
 
+const clickIcon = L.divIcon({
+  className: 'click-marker',
+  html: '<span class="click-marker-dot"></span>',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+})
+
 function pointToLatLng(p: Coordinates): [number, number] {
   return [p.latitude, p.longitude]
+}
+
+function FitRouteBounds({ points }: { points: [number, number][] }) {
+  const map = useMap()
+  useEffect(() => {
+    if (points.length > 0) {
+      map.fitBounds(L.latLngBounds(points.map((p) => L.latLng(p[0], p[1]))), { padding: [50, 50] })
+    }
+  }, [map, points])
+  return null
 }
 
 export function RouteBuilderPage() {
@@ -73,7 +90,10 @@ export function RouteBuilderPage() {
     setRouteResult(null)
   }
 
-  const routeNodes: [number, number][] = (routeResult?.nodes ?? []).map((n: RouteNode) => [n.latitude, n.longitude])
+  const routeNodes: [number, number][] = useMemo(
+    () => (routeResult?.nodes ?? []).map((n: RouteNode) => [n.latitude, n.longitude]),
+    [routeResult]
+  )
 
   return (
     <div className="route-page">
@@ -161,6 +181,8 @@ export function RouteBuilderPage() {
 
             <MapClickHandler onMapClick={handleMapClick} />
 
+            {clickPoint && <Marker position={pointToLatLng(clickPoint)} icon={clickIcon} />}
+
             {start && <Marker position={pointToLatLng(start)} icon={startIcon} />}
             {finish && <Marker position={pointToLatLng(finish)} icon={finishIcon} />}
 
@@ -170,6 +192,8 @@ export function RouteBuilderPage() {
                 pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.85 }}
               />
             )}
+
+            {routeNodes.length > 1 && <FitRouteBounds points={routeNodes} />}
           </MapContainer>
 
           {clickPoint && (

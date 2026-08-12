@@ -13,9 +13,11 @@ const MOBILITY_PROFILES: { value: MobilityProfile; label: string; icon: string }
 export function RoutePanel({
   clickPoint,
   onPointSelected,
+  onRouteResult,
 }: {
   clickPoint: Coordinates | null
   onPointSelected: () => void
+  onRouteResult?: (route: any) => void
 }) {
   const [start, setStart] = useState<Coordinates | null>(null)
   const [finish, setFinish] = useState<Coordinates | null>(null)
@@ -30,6 +32,7 @@ export function RoutePanel({
     onSuccess: (data) => {
       console.log('Route built:', data)
       setIsBuilding(false)
+      onRouteResult?.(data)
     },
     onError: (error) => {
       console.error('Route error:', error)
