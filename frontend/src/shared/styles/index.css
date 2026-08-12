@@ -1251,6 +1251,34 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-text);
 }
 
+.route-pick-point {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  border: 1px solid #c7d2fe;
+}
+
+.route-point-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.route-point-coords {
+  font-size: 13px;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+.route-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
 /* ============================================================
    Страница построения маршрута
    ============================================================ */
@@ -1293,26 +1321,6 @@ h1, h2, h3, h4, h5, h6 {
 .route-map-panel .leaflet-container {
   height: 100%;
   width: 100%;
-}
-
-.route-point-set {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.route-point-coords {
-  font-size: 13px;
-  color: var(--color-primary);
-  font-variant-numeric: tabular-nums;
-  word-break: break-all;
-}
-
-.route-hint {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin: 0;
 }
 
 .route-point-marker {

@@ -10,7 +10,13 @@ const MOBILITY_PROFILES: { value: MobilityProfile; label: string; icon: string }
   { value: 'default', label: 'Обычный пешеход', icon: '🚶' },
 ]
 
-export function RoutePanel() {
+export function RoutePanel({
+  clickPoint,
+  onPointSelected,
+}: {
+  clickPoint: Coordinates | null
+  onPointSelected: () => void
+}) {
   const [start, setStart] = useState<Coordinates | null>(null)
   const [finish, setFinish] = useState<Coordinates | null>(null)
   const [profile, setProfile] = useState<MobilityProfile>('default')
@@ -42,49 +48,63 @@ export function RoutePanel() {
       <div className="route-panel-header">
         <h3>🧭 Построить маршрут</h3>
       </div>
-      
+
+      {clickPoint && (
+        <div className="route-pick-point">
+          <p className="route-hint">Точка на карте: {clickPoint.latitude}, {clickPoint.longitude}</p>
+          <div className="click-point-actions">
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setStart(clickPoint)
+                onPointSelected()
+              }}
+            >
+              Отсюда
+            </button>
+            <button
+              className="btn btn-success btn-sm"
+              onClick={() => {
+                setFinish(clickPoint)
+                onPointSelected()
+              }}
+            >
+              Сюда
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={onPointSelected}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="route-form">
         <div className="form-group">
           <label>Точка начала</label>
-          <div className="coords-input">
-            <input
-              type="number"
-              step="0.000001"
-              placeholder="Широта"
-              value={start?.latitude || ''}
-              onChange={(e) => setStart({ ...(start || { latitude: 0, longitude: 0 }), latitude: parseFloat(e.target.value) })}
-            />
-            <input
-              type="number"
-              step="0.000001"
-              placeholder="Долгота"
-              value={start?.longitude || ''}
-              onChange={(e) => setStart({ ...(start || { latitude: 0, longitude: 0 }), longitude: parseFloat(e.target.value) })}
-            />
-          </div>
-          <button className="btn btn-sm btn-secondary" onClick={() => navigator.geolocation.getCurrentPosition((pos) => setStart({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }))}>
-            Моя позиция
-          </button>
+          {start ? (
+            <div className="route-point-set">
+              <span className="route-point-coords">{start.latitude}, {start.longitude}</span>
+              <button className="btn btn-sm btn-secondary" onClick={() => setStart(null)}>
+                Очистить
+              </button>
+            </div>
+          ) : (
+            <p className="route-hint">Кликните по карте и выберите «Отсюда»</p>
+          )}
         </div>
 
         <div className="form-group">
           <label>Точка конца</label>
-          <div className="coords-input">
-            <input
-              type="number"
-              step="0.000001"
-              placeholder="Широта"
-              value={finish?.latitude || ''}
-              onChange={(e) => setFinish({ ...(finish || { latitude: 0, longitude: 0 }), latitude: parseFloat(e.target.value) })}
-            />
-            <input
-              type="number"
-              step="0.000001"
-              placeholder="Долгота"
-              value={finish?.longitude || ''}
-              onChange={(e) => setFinish({ ...(finish || { latitude: 0, longitude: 0 }), longitude: parseFloat(e.target.value) })}
-            />
-          </div>
+          {finish ? (
+            <div className="route-point-set">
+              <span className="route-point-coords">{finish.latitude}, {finish.longitude}</span>
+              <button className="btn btn-sm btn-secondary" onClick={() => setFinish(null)}>
+                Очистить
+              </button>
+            </div>
+          ) : (
+            <p className="route-hint">Кликните по карте и выберите «Сюда»</p>
+          )}
         </div>
 
         <div className="form-group">
@@ -103,13 +123,19 @@ export function RoutePanel() {
           </div>
         </div>
 
-        <button 
-          className="btn btn-primary btn-block" 
+        <button
+          className="btn btn-primary btn-block"
           onClick={handleBuildRoute}
           disabled={!start || !finish || isBuilding}
         >
           {isBuilding ? 'Строим маршрут...' : 'Построить маршрут'}
         </button>
+
+        {buildRouteMutation.error && (
+          <div className="alert-error">
+            {(buildRouteMutation.error as any)?.response?.data?.error || 'Не удалось построить маршрут'}
+          </div>
+        )}
 
         {buildRouteMutation.data && (
           <div className="route-result">

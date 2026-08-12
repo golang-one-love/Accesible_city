@@ -226,7 +226,7 @@ export function MapPage() {
       )}
       
       <VolunteerPanel />
-      <RoutePanel />
+      <RoutePanel clickPoint={clickPoint} onPointSelected={() => setClickPoint(null)} />
     </div>
   )
 }
