@@ -3,13 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@features/auth/store'
 import { api } from '@shared/api/axios'
 
-const ROLES = [
-  { value: 'user', label: 'Пользователь' },
-  { value: 'volunteer', label: 'Волонтёр' },
-  { value: 'moderator', label: 'Модератор' },
-  { value: 'business_owner', label: 'Владелец бизнеса' },
-]
-
 export function RegisterPage() {
   const navigate = useNavigate()
   const { setTokens, setUser, initializeAuth } = useAuthStore()
@@ -17,7 +10,6 @@ export function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'user',
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -42,7 +34,6 @@ export function RegisterPage() {
       const response = await api.post('/auth/register', {
         email: formData.email,
         password: formData.password,
-        role: formData.role,
       })
       const { user, access_token, refresh_token } = response.data
       setTokens(access_token, refresh_token)
@@ -102,19 +93,6 @@ export function RegisterPage() {
               required
               autoComplete="new-password"
             />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="role">Роль</label>
-            <select
-              id="role"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            >
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
           </div>
           
           <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}>

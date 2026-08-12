@@ -11,6 +11,7 @@ export function Header() {
     { path: '/', label: 'Карта', icon: '🗺️' },
     { path: '/route', label: 'Маршрут', icon: '🧭' },
     { path: '/barrier/new', label: 'Добавить барьер', icon: '➕' },
+    { path: '/profile', label: 'Профиль', icon: '👤' },
   ]
 
   const adminNavItems = [
@@ -74,7 +75,7 @@ export function Header() {
           {user ? (
             <div className="user-menu">
               <span className="user-role">{user.role}</span>
-              <span className="user-email">{user.email}</span>
+              <span className="user-email">{user.nickname || user.email}</span>
               <button onClick={logout} className="btn btn-secondary btn-sm">
                 Выйти
               </button>
