@@ -25,12 +25,14 @@ L.Marker.prototype.options.icon = iconDefault
 
 const MOSCOW_CENTER = [55.7558, 37.6173] as [number, number]
 
+const roundCoord = (value: number) => Math.round(value * 1e6) / 1e6
+
 function MapClickHandler({ onMapClick }: { onMapClick: (point: Coordinates) => void }) {
   useMapEvents({
     click: (e) => {
       const target = e.originalEvent.target as HTMLElement | null
       if (target?.closest('.leaflet-marker-icon')) return
-      onMapClick({ latitude: e.latlng.lat, longitude: e.latlng.lng })
+      onMapClick({ latitude: roundCoord(e.latlng.lat), longitude: roundCoord(e.latlng.lng) })
     },
   })
   return null

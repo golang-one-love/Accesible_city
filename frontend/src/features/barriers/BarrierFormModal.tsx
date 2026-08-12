@@ -116,7 +116,7 @@ export function BarrierFormModal({ initialCoordinates, onClose, onSave }: Barrie
               <input
                 id="latitude"
                 type="number"
-                step="0.000001"
+                step="any"
                 value={formData.latitude}
                 onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
                 required
@@ -129,7 +129,7 @@ export function BarrierFormModal({ initialCoordinates, onClose, onSave }: Barrie
               <input
                 id="longitude"
                 type="number"
-                step="0.000001"
+                step="any"
                 value={formData.longitude}
                 onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
                 required
