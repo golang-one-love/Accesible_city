@@ -43,7 +43,7 @@ export function RouteBuilderPage() {
   const [error, setError] = useState<string | null>(null)
 
   const buildRouteMutation = useMutation({
-    mutationFn: async (params: { start: Coordinates; finish: Coordinates; profile: MobilityProfile }) => {
+    mutationFn: async (params: { start: Coordinates; finish: Coordinates; mobility_profile: MobilityProfile }) => {
       const response = await api.post('/routes/build', params)
       return response.data
     },
@@ -129,7 +129,7 @@ export function RouteBuilderPage() {
 
           <button
             className="btn btn-primary btn-block"
-            onClick={() => buildRouteMutation.mutate({ start: start!, finish: finish!, profile })}
+            onClick={() => buildRouteMutation.mutate({ start: start!, finish: finish!, mobility_profile: profile })}
             disabled={!start || !finish || buildRouteMutation.isPending}
           >
             {buildRouteMutation.isPending ? 'Строим маршрут...' : 'Построить маршрут'}

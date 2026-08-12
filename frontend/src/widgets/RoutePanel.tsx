@@ -23,7 +23,7 @@ export function RoutePanel({
   const [isBuilding, setIsBuilding] = useState(false)
 
   const buildRouteMutation = useMutation({
-    mutationFn: async (params: { start: Coordinates; finish: Coordinates; profile: MobilityProfile }) => {
+    mutationFn: async (params: { start: Coordinates; finish: Coordinates; mobility_profile: MobilityProfile }) => {
       const response = await api.post('/routes/build', params)
       return response.data
     },
@@ -40,7 +40,7 @@ export function RoutePanel({
   const handleBuildRoute = () => {
     if (!start || !finish) return
     setIsBuilding(true)
-    buildRouteMutation.mutate({ start, finish, profile })
+    buildRouteMutation.mutate({ start, finish, mobility_profile: profile })
   }
 
   return (
