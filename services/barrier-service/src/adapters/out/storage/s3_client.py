@@ -17,6 +17,17 @@ class S3Storage(PhotoStorage):
             region_name="us-east-1",
         )
         self.bucket = settings.MINIO_BUCKET
+        public_endpoint = settings.MINIO_PUBLIC_URL
+        self.public_client = None
+        if public_endpoint and public_endpoint != f"http://{settings.MINIO_ENDPOINT}":
+            self.public_client = boto3.client(
+                "s3",
+                endpoint_url=public_endpoint,
+                aws_access_key_id=settings.MINIO_ACCESS_KEY,
+                aws_secret_access_key=settings.MINIO_SECRET_KEY,
+                config=Config(signature_version="s3v4"),
+                region_name="us-east-1",
+            )
         self._ensure_bucket()
 
     def _ensure_bucket(self) -> None:
@@ -46,7 +57,8 @@ class S3Storage(PhotoStorage):
             return False
 
     async def generate_presigned_url(self, key: str, expires_in: int = 3600) -> str:
-        return self.client.generate_presigned_url(
+        client = self.public_client or self.client
+        return client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": key},
             ExpiresIn=expires_in,

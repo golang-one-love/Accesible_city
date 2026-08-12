@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     REDIS_DB: int = Field(default=0, alias="REDIS_DB")
 
     MINIO_ENDPOINT: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    MINIO_PUBLIC_URL: str = Field(default="http://localhost:9000", alias="MINIO_PUBLIC_URL")
     MINIO_ACCESS_KEY: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     MINIO_SECRET_KEY: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     MINIO_BUCKET: str = Field(default="barrier-photos", alias="MINIO_BUCKET")

@@ -121,7 +121,7 @@ function ModerationActionButton({ requestId, action, comment, onDone }: {
     <button
       className={`btn ${isApprove ? 'btn-success' : 'btn-danger'} btn-sm`}
       onClick={() => mutation.mutate()}
-      disabled={mutation.isPending || (!isApprove && !comment.trim())}
+      disabled={mutation.isPending}
     >
       {mutation.isPending ? 'Сохранение...' : isApprove ? 'Одобрить' : 'Отклонить'}
     </button>
