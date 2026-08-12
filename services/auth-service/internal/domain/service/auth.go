@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/accessible-path/auth-service/internal/domain/entity"
@@ -16,6 +17,9 @@ var (
 	ErrInvalidRole        = errors.New("invalid role")
 	ErrTokenExpired       = errors.New("token has expired")
 	ErrTokenInvalid       = errors.New("token is invalid")
+	ErrForbidden          = errors.New("insufficient permissions")
+	ErrInvalidNickname    = errors.New("nickname must be 1-100 characters")
+	ErrWrongPassword      = errors.New("current password is incorrect")
 )
 
 type AuthService struct {
@@ -31,6 +35,7 @@ type UserRepository interface {
 	GetByEmail(email valueobject.Email) (*entity.User, error)
 	GetByID(id string) (*entity.User, error)
 	Update(user *entity.User) error
+	List() ([]*entity.User, error)
 }
 
 type TokenGenerator interface {
@@ -184,16 +189,84 @@ func (s *AuthService) GetUserByID(id string) (*entity.User, error) {
 	return s.userRepo.GetByID(id)
 }
 
-func (s *AuthService) UpdateUserRole(userID string, role entity.Role) error {
-	if !role.IsValid() {
-		return ErrInvalidRole
+func (s *AuthService) UpdateProfile(userID, nickname string) (*entity.User, error) {
+	nickname = strings.TrimSpace(nickname)
+	if len(nickname) == 0 || len(nickname) > 100 {
+		return nil, ErrInvalidNickname
 	}
 
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	user.UpdateNickname(nickname)
+	if err := s.userRepo.Update(user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) error {
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		return ErrUserNotFound
 	}
 
-	user.UpdateRole(role)
+	hash, err := valueobject.NewPasswordHash(user.PasswordHash)
+	if err != nil {
+		return ErrWrongPassword
+	}
+
+	oldPass, err := valueobject.NewPassword(oldPassword)
+	if err != nil {
+		return ErrWrongPassword
+	}
+
+	if err := oldPass.Compare(hash); err != nil {
+		return ErrWrongPassword
+	}
+
+	newPass, err := valueobject.NewPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	newHash, err := newPass.Hash(s.bcryptCost)
+	if err != nil {
+		return err
+	}
+
+	user.UpdatePasswordHash(newHash.String())
 	return s.userRepo.Update(user)
+}
+
+func (s *AuthService) UpdateUserRole(actorID string, actorRole entity.Role, userID string, role entity.Role) error {
+	if !role.IsValid() {
+		return ErrInvalidRole
+	}
+
+	if !actorRole.CanModerate() {
+		return ErrForbidden
+	}
+
+	if actorRole == entity.RoleModerator && role == entity.RoleAdmin {
+		return ErrForbidden
+	}
+
+	target, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	if actorRole == entity.RoleModerator && target.Role == entity.RoleAdmin {
+		return ErrForbidden
+	}
+
+	target.UpdateRole(role)
+	return s.userRepo.Update(target)
+}
+
+func (s *AuthService) ListUsers() ([]*entity.User, error) {
+	return s.userRepo.List()
 }

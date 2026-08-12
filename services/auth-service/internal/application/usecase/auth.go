@@ -34,6 +34,18 @@ func (u *authUseCase) GetUserByID(id string) (*entity.User, error) {
 	return u.authService.GetUserByID(id)
 }
 
-func (u *authUseCase) UpdateUserRole(userID string, role entity.Role) error {
-	return u.authService.UpdateUserRole(userID, role)
+func (u *authUseCase) UpdateProfile(userID, nickname string) (*entity.User, error) {
+	return u.authService.UpdateProfile(userID, nickname)
+}
+
+func (u *authUseCase) ChangePassword(userID, oldPassword, newPassword string) error {
+	return u.authService.ChangePassword(userID, oldPassword, newPassword)
+}
+
+func (u *authUseCase) UpdateUserRole(actorID string, actorRole entity.Role, userID string, role entity.Role) error {
+	return u.authService.UpdateUserRole(actorID, actorRole, userID, role)
+}
+
+func (u *authUseCase) ListUsers() ([]*entity.User, error) {
+	return u.authService.ListUsers()
 }

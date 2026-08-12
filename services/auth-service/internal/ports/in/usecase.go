@@ -11,5 +11,8 @@ type AuthUseCase interface {
 	Refresh(refreshToken string) (string, string, error)
 	ValidateAccessToken(token string) (*service.TokenClaims, error)
 	GetUserByID(id string) (*entity.User, error)
-	UpdateUserRole(userID string, role entity.Role) error
+	UpdateProfile(userID, nickname string) (*entity.User, error)
+	ChangePassword(userID, oldPassword, newPassword string) error
+	UpdateUserRole(actorID string, actorRole entity.Role, userID string, role entity.Role) error
+	ListUsers() ([]*entity.User, error)
 }

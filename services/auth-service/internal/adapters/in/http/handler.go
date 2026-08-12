@@ -27,6 +27,11 @@ func (h *AuthHandler) RegisterRoutes(g *echo.Group) {
 	g.POST("/login", h.Login)
 	g.POST("/refresh", h.Refresh)
 	g.GET("/validate", h.Validate, h.authMiddleware.RequireAuth())
+	g.GET("/profile", h.Profile, h.authMiddleware.RequireAuth())
+	g.PATCH("/profile", h.UpdateProfile, h.authMiddleware.RequireAuth())
+	g.POST("/change-password", h.ChangePassword, h.authMiddleware.RequireAuth())
+	g.GET("/users", h.ListUsers, h.authMiddleware.RequireAuth(), h.authMiddleware.RequireRoles(entity.RoleModerator, entity.RoleAdmin))
+	g.PATCH("/users/:id/role", h.UpdateUserRole, h.authMiddleware.RequireAuth(), h.authMiddleware.RequireRoles(entity.RoleModerator, entity.RoleAdmin))
 }
 
 func (h *AuthHandler) Register(c echo.Context) error {
@@ -38,8 +43,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 	}
 
-	role := entity.Role(req.Role)
-	user, accessToken, refreshToken, err := h.authUseCase.Register(req.Email, req.Password, role)
+	user, accessToken, refreshToken, err := h.authUseCase.Register(req.Email, req.Password, entity.RoleUser)
 	if err != nil {
 		return h.handleError(c, err)
 	}
@@ -92,6 +96,79 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 	})
 }
 
+func (h *AuthHandler) Profile(c echo.Context) error {
+	user, err := h.authUseCase.GetUserByID(GetUserID(c))
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(http.StatusOK, toUserResponse(user))
+}
+
+func (h *AuthHandler) UpdateProfile(c echo.Context) error {
+	var req UpdateProfileRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+	}
+	if req.Nickname == "" {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: service.ErrInvalidNickname.Error()})
+	}
+
+	user, err := h.authUseCase.UpdateProfile(GetUserID(c), req.Nickname)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(http.StatusOK, toUserResponse(user))
+}
+
+func (h *AuthHandler) ChangePassword(c echo.Context) error {
+	var req ChangePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+	}
+	if err := c.Validate(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	}
+
+	if err := h.authUseCase.ChangePassword(GetUserID(c), req.OldPassword, req.NewPassword); err != nil {
+		return h.handleError(c, err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *AuthHandler) ListUsers(c echo.Context) error {
+	users, err := h.authUseCase.ListUsers()
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	response := UsersResponse{Users: make([]UserResponse, 0, len(users))}
+	for _, user := range users {
+		response.Users = append(response.Users, toUserResponse(user))
+	}
+	return c.JSON(http.StatusOK, response)
+}
+
+func (h *AuthHandler) UpdateUserRole(c echo.Context) error {
+	var req UpdateRoleRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+	}
+	if err := c.Validate(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	}
+
+	targetID := c.Param("id")
+	if err := h.authUseCase.UpdateUserRole(GetUserID(c), GetUserRole(c), targetID, entity.Role(req.Role)); err != nil {
+		return h.handleError(c, err)
+	}
+
+	user, err := h.authUseCase.GetUserByID(targetID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(http.StatusOK, toUserResponse(user))
+}
+
 func (h *AuthHandler) Validate(c echo.Context) error {
 	claims, err := h.authUseCase.ValidateAccessToken(c.Request().Header.Get("Authorization")[7:])
 	if err != nil {
@@ -112,8 +189,12 @@ func (h *AuthHandler) handleError(c echo.Context, err error) error {
 		return c.JSON(http.StatusConflict, ErrorResponse{Error: err.Error()})
 	case service.ErrInvalidCredentials, service.ErrUserInactive:
 		return c.JSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
-	case service.ErrInvalidRole:
+	case service.ErrInvalidRole, service.ErrInvalidNickname:
 		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	case service.ErrWrongPassword:
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+	case service.ErrForbidden:
+		return c.JSON(http.StatusForbidden, ErrorResponse{Error: err.Error()})
 	case service.ErrTokenExpired, service.ErrTokenInvalid:
 		return c.JSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
 	case service.ErrUserNotFound:
@@ -127,6 +208,7 @@ func toUserResponse(user *entity.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
 		Email:     user.Email.String(),
+		Nickname:  user.Nickname,
 		Role:      string(user.Role),
 		IsActive:  user.IsActive,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),

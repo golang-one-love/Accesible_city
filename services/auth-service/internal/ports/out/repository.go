@@ -10,6 +10,7 @@ type UserRepository interface {
 	GetByEmail(email valueobject.Email) (*entity.User, error)
 	GetByID(id string) (*entity.User, error)
 	Update(user *entity.User) error
+	List() ([]*entity.User, error)
 }
 
 type TokenGenerator interface {
