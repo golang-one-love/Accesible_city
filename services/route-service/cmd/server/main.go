@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -81,14 +80,14 @@ func main() {
 	}()
 
 	graph, err := graphRepo.LoadGraph()
-	if err != nil || len(graph.Nodes) == 0 {
+	if err != nil || graph.NumNodes() == 0 {
 		logger.Warn("no cached graph found, importing OSM roads...", zap.Error(err))
 		if impErr := routeUseCase.ImportOSM(cfg.OSMDefaultBBox); impErr != nil {
 			logger.Warn("OSM import failed, falling back to default grid", zap.Error(impErr))
 			graph = createDefaultGrid()
 		} else {
 			graph, err = graphRepo.LoadGraph()
-			if err != nil || len(graph.Nodes) == 0 {
+			if err != nil || graph.NumNodes() == 0 {
 				logger.Warn("failed to reload imported graph, using default grid", zap.Error(err))
 				graph = createDefaultGrid()
 			}
@@ -214,7 +213,7 @@ func (v *validator) Validate(i interface{}) error {
 
 func createDefaultGrid() *entity.Graph {
 	graph := entity.NewGraph()
-	
+
 	gridSize := 10
 	spacing := 0.001
 	baseLat := 55.75
@@ -222,55 +221,46 @@ func createDefaultGrid() *entity.Graph {
 
 	for i := 0; i < gridSize; i++ {
 		for j := 0; j < gridSize; j++ {
-			nodeID := fmt.Sprintf("node_%d_%d", i, j)
+			nodeID := int64(i*gridSize + j)
 			lat := baseLat + float64(i)*spacing
 			lon := baseLon + float64(j)*spacing
-			
-			node := &entity.Node{
+
+			graph.AddNode(entity.Node{
 				ID:        nodeID,
 				Latitude:  lat,
 				Longitude: lon,
-			}
-			graph.AddNode(node)
+			})
 		}
 	}
 
 	for i := 0; i < gridSize; i++ {
 		for j := 0; j < gridSize; j++ {
-			nodeID := fmt.Sprintf("node_%d_%d", i, j)
-			
+			nodeID := int64(i*gridSize + j)
+
 			if i > 0 {
-				neighborID := fmt.Sprintf("node_%d_%d", i-1, j)
-				graph.AddEdge(&entity.Edge{
-					From:     nodeID,
-					To:       neighborID,
+				graph.AddEdge(nodeID, entity.Edge{
+					To:       int64((i-1)*gridSize + j),
 					Distance: spacing * 111000,
 					Severity: 1,
 				})
 			}
 			if i < gridSize-1 {
-				neighborID := fmt.Sprintf("node_%d_%d", i+1, j)
-				graph.AddEdge(&entity.Edge{
-					From:     nodeID,
-					To:       neighborID,
+				graph.AddEdge(nodeID, entity.Edge{
+					To:       int64((i+1)*gridSize + j),
 					Distance: spacing * 111000,
 					Severity: 1,
 				})
 			}
 			if j > 0 {
-				neighborID := fmt.Sprintf("node_%d_%d", i, j-1)
-				graph.AddEdge(&entity.Edge{
-					From:     nodeID,
-					To:       neighborID,
+				graph.AddEdge(nodeID, entity.Edge{
+					To:       int64(i*gridSize + j - 1),
 					Distance: spacing * 111000,
 					Severity: 1,
 				})
 			}
 			if j < gridSize-1 {
-				neighborID := fmt.Sprintf("node_%d_%d", i, j+1)
-				graph.AddEdge(&entity.Edge{
-					From:     nodeID,
-					To:       neighborID,
+				graph.AddEdge(nodeID, entity.Edge{
+					To:       int64(i*gridSize + j + 1),
 					Distance: spacing * 111000,
 					Severity: 1,
 				})

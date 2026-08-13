@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/accessible-path/route-service/internal/domain/entity"
 	"github.com/accessible-path/route-service/internal/domain/valueobject"
@@ -133,7 +134,7 @@ func toNodeResponses(nodes []*entity.Node) []NodeResponse {
 	resp := make([]NodeResponse, len(nodes))
 	for i, n := range nodes {
 		resp[i] = NodeResponse{
-			ID:        n.ID,
+			ID:        "osm:" + strconv.FormatInt(n.ID, 10),
 			Latitude:  n.Latitude,
 			Longitude: n.Longitude,
 		}

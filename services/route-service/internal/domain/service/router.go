@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	ErrNoPathFound          = errors.New("no path found")
-	ErrInvalidProfile       = errors.New("invalid mobility profile")
-	ErrStartOutOfCoverage   = errors.New("start point is too far from mapped roads (outside map coverage)")
-	ErrFinishOutOfCoverage  = errors.New("finish point is too far from mapped roads (outside map coverage)")
-	ErrSearchLimitExceeded  = errors.New("route search exceeded its limits; try a shorter distance or a different profile")
+	ErrNoPathFound         = errors.New("no path found")
+	ErrInvalidProfile      = errors.New("invalid mobility profile")
+	ErrStartOutOfCoverage  = errors.New("start point is too far from mapped roads (outside map coverage)")
+	ErrFinishOutOfCoverage = errors.New("finish point is too far from mapped roads (outside map coverage)")
+	ErrSearchLimitExceeded = errors.New("route search exceeded its limits; try a shorter distance or a different profile")
 )
 
 // maxSnapDistanceMeters is how far a requested point may be from the nearest
@@ -49,13 +49,13 @@ func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entit
 
 	maxSeverity := profile.MaxSeverity()
 
-	startNode, startDist := r.findNearestNode(start)
-	finishNode, finishDist := r.findNearestNode(finish)
+	startNodeID, startDist, startFound := r.findNearestNode(start)
+	finishNodeID, finishDist, finishFound := r.findNearestNode(finish)
 
-	if startNode == nil || startDist > maxSnapDistanceMeters {
+	if !startFound || startDist > maxSnapDistanceMeters {
 		return nil, ErrStartOutOfCoverage
 	}
-	if finishNode == nil || finishDist > maxSnapDistanceMeters {
+	if !finishFound || finishDist > maxSnapDistanceMeters {
 		return nil, ErrFinishOutOfCoverage
 	}
 
@@ -70,25 +70,25 @@ func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entit
 		barriers = nil
 	}
 
-	blockedNodes := make(map[string]bool)
+	blockedNodes := make(map[int64]bool)
 	for _, b := range barriers {
 		if b.Severity <= maxSeverity {
-			node, dist := r.findNearestNode(valueobject.Coordinates{Latitude: b.Latitude, Longitude: b.Longitude})
-			if node != nil && dist <= maxSnapDistanceMeters {
-				blockedNodes[node.ID] = true
+			nodeID, dist, found := r.findNearestNode(valueobject.Coordinates{Latitude: b.Latitude, Longitude: b.Longitude})
+			if found && dist <= maxSnapDistanceMeters {
+				blockedNodes[nodeID] = true
 			}
 		}
 	}
 
-	return r.aStar(startNode.ID, finishNode.ID, blockedNodes, maxSeverity)
+	return r.aStar(startNodeID, finishNodeID, blockedNodes, maxSeverity)
 }
 
-func (r *Router) findNearestNode(coord valueobject.Coordinates) (*entity.Node, float64) {
+func (r *Router) findNearestNode(coord valueobject.Coordinates) (int64, float64, bool) {
 	return r.graph.FindNearest(coord.Latitude, coord.Longitude)
 }
 
 type aStarNode struct {
-	nodeID string
+	nodeID int64
 	gScore float64
 	fScore float64
 	index  int
@@ -96,7 +96,7 @@ type aStarNode struct {
 
 type priorityQueue []*aStarNode
 
-func (pq priorityQueue) Len() int { return len(pq) }
+func (pq priorityQueue) Len() int           { return len(pq) }
 func (pq priorityQueue) Less(i, j int) bool { return pq[i].fScore < pq[j].fScore }
 func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
@@ -116,11 +116,11 @@ func (pq *priorityQueue) Pop() interface{} {
 	return n
 }
 
-func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, maxSeverity int) (*entity.Route, error) {
-	startNode := r.graph.GetNode(startID)
-	finishNode := r.graph.GetNode(finishID)
+func (r *Router) aStar(startID, finishID int64, blockedNodes map[int64]bool, maxSeverity int) (*entity.Route, error) {
+	startNode, startOK := r.graph.GetNode(startID)
+	finishNode, finishOK := r.graph.GetNode(finishID)
 
-	if startNode == nil || finishNode == nil {
+	if !startOK || !finishOK {
 		return nil, ErrNoPathFound
 	}
 
@@ -129,8 +129,8 @@ func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, m
 	}
 
 	openSet := make(priorityQueue, 0)
-	gScores := make(map[string]float64)
-	cameFrom := make(map[string]*aStarNode)
+	gScores := make(map[int64]float64)
+	cameFrom := make(map[int64]*aStarNode)
 
 	start := &aStarNode{
 		nodeID: startID,
@@ -165,8 +165,8 @@ func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, m
 				continue
 			}
 
-			neighborNode := r.graph.GetNode(edge.To)
-			if neighborNode == nil {
+			neighborNode, ok := r.graph.GetNode(edge.To)
+			if !ok {
 				continue
 			}
 
@@ -188,15 +188,15 @@ func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, m
 	return nil, ErrNoPathFound
 }
 
-func (r *Router) heuristic(a, b *entity.Node) float64 {
+func (r *Router) heuristic(a, b entity.Node) float64 {
 	coordA := valueobject.Coordinates{Latitude: a.Latitude, Longitude: a.Longitude}
 	coordB := valueobject.Coordinates{Latitude: b.Latitude, Longitude: b.Longitude}
 	return coordA.HaversineDistance(coordB)
 }
 
-func (r *Router) reconstructPath(cameFrom map[string]*aStarNode, end *aStarNode, finishNode *entity.Node) *entity.Route {
+func (r *Router) reconstructPath(cameFrom map[int64]*aStarNode, end *aStarNode, finishNode entity.Node) *entity.Route {
 	route := entity.NewRoute()
-	var path []string
+	var path []int64
 	for id := end.nodeID; ; {
 		path = append(path, id)
 		prev := cameFrom[id]
@@ -207,26 +207,28 @@ func (r *Router) reconstructPath(cameFrom map[string]*aStarNode, end *aStarNode,
 	}
 
 	for i := len(path) - 1; i >= 0; i-- {
-		node := r.graph.GetNode(path[i])
-		if node != nil {
-			var dist float64
-			var sev int
-			if i < len(path)-1 {
-				nextNode := r.graph.GetNode(path[i+1])
-				if nextNode != nil {
-					coord1 := valueobject.Coordinates{Latitude: node.Latitude, Longitude: node.Longitude}
-					coord2 := valueobject.Coordinates{Latitude: nextNode.Latitude, Longitude: nextNode.Longitude}
-					dist = coord1.HaversineDistance(coord2)
-					for _, edge := range r.graph.GetEdges(path[i]) {
-						if edge.To == path[i+1] {
-							sev = edge.Severity
-							break
-						}
-					}
+		node, ok := r.graph.GetNode(path[i])
+		if !ok {
+			continue
+		}
+		var dist float64
+		var sev int
+		if i < len(path)-1 {
+			nextNode, ok := r.graph.GetNode(path[i+1])
+			if !ok {
+				continue
+			}
+			coord1 := valueobject.Coordinates{Latitude: node.Latitude, Longitude: node.Longitude}
+			coord2 := valueobject.Coordinates{Latitude: nextNode.Latitude, Longitude: nextNode.Longitude}
+			dist = coord1.HaversineDistance(coord2)
+			for _, edge := range r.graph.GetEdges(path[i]) {
+				if edge.To == path[i+1] {
+					sev = edge.Severity
+					break
 				}
 			}
-			route.AddNode(node, dist, sev)
 		}
+		route.AddNode(&entity.Node{ID: node.ID, Latitude: node.Latitude, Longitude: node.Longitude}, dist, sev)
 	}
 
 	return route

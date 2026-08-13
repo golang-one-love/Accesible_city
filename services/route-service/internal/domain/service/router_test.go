@@ -34,7 +34,7 @@ func buildTestGrid(gridGraph int) *entity.Graph {
 	for i := 0; i < gridGraph; i++ {
 		for j := 0; j < gridGraph; j++ {
 			id := nodeID(i, j)
-			g.AddNode(&entity.Node{
+			g.AddNode(entity.Node{
 				ID:        id,
 				Latitude:  55.7 + float64(i)*0.001,
 				Longitude: 37.5 + float64(j)*0.001,
@@ -56,13 +56,13 @@ func buildTestGrid(gridGraph int) *entity.Graph {
 	return g
 }
 
-func nodeID(i, j int) string {
-	return "n_" + string(rune('0'+i)) + string(rune('0'+j))
+func nodeID(i, j int) int64 {
+	return int64(i*100 + j)
 }
 
-func addBidirectionalEdge(g *entity.Graph, from, to string, distance float64) {
-	g.AddEdge(&entity.Edge{From: from, To: to, Distance: distance, Severity: 1})
-	g.AddEdge(&entity.Edge{From: to, To: from, Distance: distance, Severity: 1})
+func addBidirectionalEdge(g *entity.Graph, from, to int64, distance float64) {
+	g.AddEdge(from, entity.Edge{To: to, Distance: distance, Severity: 1})
+	g.AddEdge(to, entity.Edge{To: from, Distance: distance, Severity: 1})
 }
 
 func newTestRouter() *Router {
@@ -113,9 +113,9 @@ func TestBuildRouteFinishOutOfCoverage(t *testing.T) {
 
 func TestBuildRouteNoPath(t *testing.T) {
 	g := entity.NewGraph()
-	g.AddNode(&entity.Node{ID: "a", Latitude: 55.70, Longitude: 37.50})
-	g.AddNode(&entity.Node{ID: "b", Latitude: 55.71, Longitude: 37.51})
-	g.AddEdge(&entity.Edge{From: "a", To: "b", Distance: 100, Severity: 1})
+	g.AddNode(entity.Node{ID: 1, Latitude: 55.70, Longitude: 37.50})
+	g.AddNode(entity.Node{ID: 2, Latitude: 55.71, Longitude: 37.51})
+	g.AddEdge(1, entity.Edge{To: 2, Distance: 100, Severity: 1})
 	g.BuildIndex()
 
 	r := NewRouter(g, &fakeBarrierProvider{})
@@ -170,10 +170,10 @@ func TestBuildRouteBlocksObstacleNode(t *testing.T) {
 
 func TestBuildRouteBlockedUnreachable(t *testing.T) {
 	g := entity.NewGraph()
-	g.AddNode(&entity.Node{ID: "a", Latitude: 55.70, Longitude: 37.50})
-	g.AddNode(&entity.Node{ID: "b", Latitude: 55.71, Longitude: 37.51})
-	g.AddEdge(&entity.Edge{From: "a", To: "b", Distance: 100, Severity: 1})
-	g.AddEdge(&entity.Edge{From: "b", To: "a", Distance: 100, Severity: 1})
+	g.AddNode(entity.Node{ID: 1, Latitude: 55.70, Longitude: 37.50})
+	g.AddNode(entity.Node{ID: 2, Latitude: 55.71, Longitude: 37.51})
+	g.AddEdge(1, entity.Edge{To: 2, Distance: 100, Severity: 1})
+	g.AddEdge(2, entity.Edge{To: 1, Distance: 100, Severity: 1})
 	g.BuildIndex()
 
 	provider := &fakeBarrierProvider{barriers: []out.BarrierInfo{

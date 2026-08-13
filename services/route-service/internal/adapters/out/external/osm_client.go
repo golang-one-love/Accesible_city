@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/accessible-path/route-service/internal/domain/entity"
@@ -87,11 +86,11 @@ func (c *OSMClient) fetchOnce(req *http.Request) (*entity.Graph, error) {
 		return nil, fmt.Errorf("decode overpass response: %w", err)
 	}
 
-	nodes := make(map[int64]*entity.Node)
+	nodes := make(map[int64]entity.Node)
 	for _, el := range data.Elements {
 		if el.Type == "node" {
-			nodes[el.ID] = &entity.Node{
-				ID:        osmNodeID(el.ID),
+			nodes[el.ID] = entity.Node{
+				ID:        el.ID,
 				Latitude:  el.Lat,
 				Longitude: el.Lon,
 			}
@@ -119,16 +118,12 @@ func (c *OSMClient) fetchOnce(req *http.Request) (*entity.Graph, error) {
 			}
 			dist := valueobject.Coordinates{Latitude: from.Latitude, Longitude: from.Longitude}.
 				HaversineDistance(valueobject.Coordinates{Latitude: to.Latitude, Longitude: to.Longitude})
-			graph.AddEdge(&entity.Edge{From: from.ID, To: to.ID, Distance: dist, Severity: severity})
-			graph.AddEdge(&entity.Edge{From: to.ID, To: from.ID, Distance: dist, Severity: severity})
+			graph.AddEdge(from.ID, entity.Edge{To: to.ID, Distance: dist, Severity: severity})
+			graph.AddEdge(to.ID, entity.Edge{To: from.ID, Distance: dist, Severity: severity})
 		}
 	}
 
 	return graph, nil
-}
-
-func osmNodeID(id int64) string {
-	return "osm:" + strconv.FormatInt(id, 10)
 }
 
 // highwaySeverity returns 0 for highways that are not pedestrian-routable.

@@ -4,11 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/accessible-path/route-service/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func parseNodeIDLegacy(key string) int64 {
+	key = strings.TrimPrefix(key, "osm:")
+	id, err := strconv.ParseInt(key, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
 
 type PostgresRouteRepository struct {
 	pool *pgxpool.Pool
@@ -129,7 +140,24 @@ func scanRoute(row routeScanner) (*entity.SavedRoute, error) {
 	}
 
 	if err := json.Unmarshal(pointsJSON, &route.Points); err != nil {
-		return nil, fmt.Errorf("unmarshal points: %w", err)
+		// Legacy points stored string ids ("osm:<id>"); convert them so old
+		// saved routes keep working with the int64 node ids.
+		var legacy []struct {
+			ID        string
+			Latitude  float64
+			Longitude float64
+		}
+		if lerr := json.Unmarshal(pointsJSON, &legacy); lerr != nil {
+			return nil, fmt.Errorf("unmarshal points: %w", err)
+		}
+		route.Points = make([]*entity.Node, len(legacy))
+		for i, p := range legacy {
+			route.Points[i] = &entity.Node{
+				ID:        parseNodeIDLegacy(p.ID),
+				Latitude:  p.Latitude,
+				Longitude: p.Longitude,
+			}
+		}
 	}
 
 	return &route, nil
