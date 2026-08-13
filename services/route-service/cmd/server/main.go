@@ -94,6 +94,7 @@ func main() {
 			}
 		}
 	}
+	graph.BuildIndex()
 	router.SetGraph(graph)
 	graphCache.Set(graph)
 

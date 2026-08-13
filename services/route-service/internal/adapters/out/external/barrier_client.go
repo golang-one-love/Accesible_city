@@ -18,12 +18,12 @@ type BarrierClient struct {
 func NewBarrierClient(baseURL string) *BarrierClient {
 	return &BarrierClient{
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 5 * time.Second},
+		client:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 func (c *BarrierClient) GetBarriersInBounds(minLat, minLon, maxLat, maxLon float64) ([]out.BarrierInfo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	url := fmt.Sprintf("%s/api/v1/barriers?status=approved&sw_lat=%f&sw_lon=%f&ne_lat=%f&ne_lon=%f&limit=1000",

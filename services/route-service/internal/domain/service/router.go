@@ -3,7 +3,7 @@ package service
 import (
 	"container/heap"
 	"errors"
-	"math"
+	"log/slog"
 
 	"github.com/accessible-path/route-service/internal/domain/entity"
 	"github.com/accessible-path/route-service/internal/domain/valueobject"
@@ -11,9 +11,20 @@ import (
 )
 
 var (
-	ErrNoPathFound    = errors.New("no path found")
-	ErrInvalidProfile = errors.New("invalid mobility profile")
+	ErrNoPathFound          = errors.New("no path found")
+	ErrInvalidProfile       = errors.New("invalid mobility profile")
+	ErrStartOutOfCoverage   = errors.New("start point is too far from mapped roads (outside map coverage)")
+	ErrFinishOutOfCoverage  = errors.New("finish point is too far from mapped roads (outside map coverage)")
+	ErrSearchLimitExceeded  = errors.New("route search exceeded its limits; try a shorter distance or a different profile")
 )
+
+// maxSnapDistanceMeters is how far a requested point may be from the nearest
+// graph node before the route is rejected with a coverage error.
+const maxSnapDistanceMeters = 3000.0
+
+// maxSearchIterations caps A* work so a pathological request cannot hang the
+// service. With ~500k nodes and dense edges this is far beyond any real path.
+const maxSearchIterations = 2000000
 
 type Router struct {
 	graph       *entity.Graph
@@ -38,11 +49,14 @@ func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entit
 
 	maxSeverity := profile.MaxSeverity()
 
-	startNode := r.findNearestNode(start)
-	finishNode := r.findNearestNode(finish)
+	startNode, startDist := r.findNearestNode(start)
+	finishNode, finishDist := r.findNearestNode(finish)
 
-	if startNode == nil || finishNode == nil {
-		return nil, ErrNoPathFound
+	if startNode == nil || startDist > maxSnapDistanceMeters {
+		return nil, ErrStartOutOfCoverage
+	}
+	if finishNode == nil || finishDist > maxSnapDistanceMeters {
+		return nil, ErrFinishOutOfCoverage
 	}
 
 	barriers, err := r.barrierRepo.GetBarriersInBounds(
@@ -50,14 +64,17 @@ func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entit
 		finish.Latitude, finish.Longitude,
 	)
 	if err != nil {
-		return nil, err
+		// A barrier-service outage must not take down routing entirely:
+		// log and build the route without barrier blocks.
+		slog.Warn("barrier fetch failed, building route without barriers", "error", err)
+		barriers = nil
 	}
 
 	blockedNodes := make(map[string]bool)
 	for _, b := range barriers {
 		if b.Severity <= maxSeverity {
-			node := r.findNearestNode(valueobject.Coordinates{Latitude: b.Latitude, Longitude: b.Longitude})
-			if node != nil {
+			node, dist := r.findNearestNode(valueobject.Coordinates{Latitude: b.Latitude, Longitude: b.Longitude})
+			if node != nil && dist <= maxSnapDistanceMeters {
 				blockedNodes[node.ID] = true
 			}
 		}
@@ -66,18 +83,8 @@ func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entit
 	return r.aStar(startNode.ID, finishNode.ID, blockedNodes, maxSeverity)
 }
 
-func (r *Router) findNearestNode(coord valueobject.Coordinates) *entity.Node {
-	var nearest *entity.Node
-	minDist := math.MaxFloat64
-
-	for _, node := range r.graph.Nodes {
-		d := coord.HaversineDistance(valueobject.Coordinates{Latitude: node.Latitude, Longitude: node.Longitude})
-		if d < minDist {
-			minDist = d
-			nearest = node
-		}
-	}
-	return nearest
+func (r *Router) findNearestNode(coord valueobject.Coordinates) (*entity.Node, float64) {
+	return r.graph.FindNearest(coord.Latitude, coord.Longitude)
 }
 
 type aStarNode struct {
@@ -133,8 +140,18 @@ func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, m
 	heap.Push(&openSet, start)
 	gScores[startID] = 0
 
-	for openSet.Len() > 0 {
+	for iterations := 0; openSet.Len() > 0; iterations++ {
 		current := heap.Pop(&openSet).(*aStarNode)
+
+		// The node may have been pushed several times with improving gScores;
+		// entries with a stale (outdated) gScore must be skipped, not re-expanded.
+		if gScores[current.nodeID] < current.gScore {
+			continue
+		}
+
+		if iterations > maxSearchIterations {
+			return nil, ErrSearchLimitExceeded
+		}
 
 		if current.nodeID == finishID {
 			return r.reconstructPath(cameFrom, current, finishNode), nil
