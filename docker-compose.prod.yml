@@ -286,7 +286,7 @@ services:
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 15s
       timeout: 5s
       retries: 20
@@ -311,7 +311,6 @@ services:
       - ./infra/nginx/certbot:/var/www/certbot:ro
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       auth-service:
         condition: service_healthy
