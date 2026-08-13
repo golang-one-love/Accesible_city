@@ -69,6 +69,16 @@ func main() {
 		}
 	}()
 
+	go func() {
+		if err := redisEventBus.Subscribe("route.updated", "notification-group", "notification-consumer-3", func(event map[string]interface{}) {
+			if err := notificationService.HandleRouteUpdated(event); err != nil {
+				logger.Error("handle route.updated", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("route.updated consumer error", zap.Error(err))
+		}
+	}()
+
 	e := echo.New()
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestID())

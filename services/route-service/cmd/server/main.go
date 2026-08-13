@@ -11,6 +11,7 @@ import (
 
 	httpapiv1 "github.com/accessible-path/route-service/internal/adapters/in/http"
 	"github.com/accessible-path/route-service/internal/adapters/out/cache"
+	"github.com/accessible-path/route-service/internal/adapters/out/eventbus"
 	"github.com/accessible-path/route-service/internal/adapters/out/external"
 	"github.com/accessible-path/route-service/internal/adapters/out/postgres"
 	"github.com/accessible-path/route-service/internal/application/usecase"
@@ -44,12 +45,35 @@ func main() {
 
 	graphCache := cache.NewMemoryGraphCache()
 	graphRepo := postgres.NewPostgresGraphRepository(pool)
+	routeRepo := postgres.NewPostgresRouteRepository(pool)
+
+	redisEventBus := eventbus.NewRedisEventBus(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
 
 	osmClient := external.NewOSMClient(cfg.OSMOverpassURL)
 	barrierClient := external.NewBarrierClient(cfg.BarrierServiceURL)
 
 	router := service.NewRouter(entity.NewGraph(), barrierClient)
-	routeUseCase := usecase.NewRouteUseCase(router, graphRepo, osmClient)
+	routeUseCase := usecase.NewRouteUseCase(router, graphRepo, routeRepo, osmClient, redisEventBus, barrierClient)
+
+	go func() {
+		if err := redisEventBus.Subscribe("barrier.approved", "route-group", "route-consumer-approved", func(event map[string]interface{}) {
+			if err := routeUseCase.HandleBarrierEvent(event); err != nil {
+				logger.Error("handle barrier.approved reroute", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.approved consumer error", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if err := redisEventBus.Subscribe("barrier.resolved", "route-group", "route-consumer-resolved", func(event map[string]interface{}) {
+			if err := routeUseCase.HandleBarrierEvent(event); err != nil {
+				logger.Error("handle barrier.resolved reroute", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.resolved consumer error", zap.Error(err))
+		}
+	}()
 
 	graph, err := graphRepo.LoadGraph()
 	if err != nil || len(graph.Nodes) == 0 {
@@ -106,15 +130,18 @@ func main() {
 }
 
 type config struct {
-	Port             string
-	PostgresHost     string
-	PostgresPort     string
-	PostgresUser     string
-	PostgresPassword string
-	PostgresDB       string
+	Port              string
+	PostgresHost      string
+	PostgresPort      string
+	PostgresUser      string
+	PostgresPassword  string
+	PostgresDB        string
 	BarrierServiceURL string
-	OSMOverpassURL   string
-	OSMDefaultBBox   string
+	OSMOverpassURL    string
+	OSMDefaultBBox    string
+	RedisAddr         string
+	RedisPassword     string
+	RedisDB           int
 }
 
 func loadConfig() config {
@@ -128,6 +155,9 @@ func loadConfig() config {
 		BarrierServiceURL: getEnv("BARRIER_SERVICE_URL", "http://barrier-service:8000"),
 		OSMOverpassURL:    getEnv("OSM_OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
 		OSMDefaultBBox:    getEnv("OSM_DEFAULT_BBOX", "55.7000,37.5200,55.8000,37.7200"),
+		RedisAddr:         getEnv("REDIS_HOST", "localhost") + ":" + getEnv("REDIS_PORT", "6379"),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		RedisDB:           0,
 	}
 }
 

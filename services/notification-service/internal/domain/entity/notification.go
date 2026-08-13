@@ -13,6 +13,7 @@ const (
 	NotificationBarrierResolved NotificationType = "barrier_resolved"
 	NotificationBarrierNearby   NotificationType = "barrier_nearby"
 	NotificationNewPOI          NotificationType = "new_poi"
+	NotificationRouteUpdated    NotificationType = "route_updated"
 )
 
 type Notification struct {

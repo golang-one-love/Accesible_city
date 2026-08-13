@@ -19,6 +19,7 @@ from src.application.dto.schemas import (
 )
 from src.application.use_cases.barrier_use_cases import (
     ApproveBarrierUseCase,
+    BarrierNotFoundError,
     ComplainBarrierUseCase,
     ConfirmBarrierUseCase,
     CreateBarrierUseCase,
@@ -91,6 +92,8 @@ async def create_barrier(
 async def get_barrier(barrier_id: UUID):
     try:
         return await get_barrier_uc.execute(barrier_id)
+    except BarrierNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 

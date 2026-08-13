@@ -22,3 +22,15 @@ export interface BuildRouteRequest {
   finish: Coordinates
   mobility_profile: MobilityProfile
 }
+
+export interface SavedRoute {
+  id: string
+  start: Coordinates
+  finish: Coordinates
+  mobility_profile: MobilityProfile
+  points: RouteNode[]
+  total_distance: number
+  max_severity: number
+  created_at: string
+  updated_at: string
+}

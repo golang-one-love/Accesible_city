@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
-import { Coordinates, MobilityProfile, RouteNode } from '@entities/route/types'
+import { Coordinates, MobilityProfile, RouteNode, SavedRoute } from '@entities/route/types'
 import { MapClickHandler } from '@shared/ui/MapClickHandler'
 
 const MOBILITY_PROFILES: { value: MobilityProfile; label: string; icon: string }[] = [
@@ -73,6 +73,48 @@ export function RouteBuilderPage() {
       setRouteResult(null)
     },
   })
+
+  const queryClient = useQueryClient()
+
+  const savedRoutesQuery = useQuery({
+    queryKey: ['saved-routes'],
+    queryFn: async () => {
+      const response = await api.get('/routes')
+      return response.data.routes as SavedRoute[]
+    },
+    retry: false,
+  })
+
+  const saveRouteMutation = useMutation({
+    mutationFn: async (params: { start: Coordinates; finish: Coordinates; mobility_profile: MobilityProfile }) => {
+      const response = await api.post('/routes/save', params)
+      return response.data
+    },
+    onSuccess: () => {
+      setSaveMessage('Маршрут сохранен')
+      setSaveError(null)
+      queryClient.invalidateQueries({ queryKey: ['saved-routes'] })
+    },
+    onError: (error: any) => {
+      setSaveError(error.response?.data?.error || 'Не удалось сохранить маршрут')
+      setSaveMessage(null)
+    },
+  })
+
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleShowSavedRoute = (route: SavedRoute) => {
+    setStart(route.start)
+    setFinish(route.finish)
+    setProfile(route.mobility_profile)
+    setRouteResult({
+      nodes: route.points,
+      total_distance: route.total_distance,
+      max_severity: route.max_severity,
+    })
+    setError(null)
+  }
 
   const handleMapClick = (point: Coordinates) => {
     setClickPoint(point)
@@ -163,6 +205,30 @@ export function RouteBuilderPage() {
               <p>Расстояние: {(routeResult.total_distance / 1000).toFixed(2)} км</p>
               <p>Макс. серьезность препятствий: {routeResult.max_severity}/5</p>
               <p>Количество точек: {routeResult.nodes.length}</p>
+              <button
+                className="btn btn-success btn-block"
+                onClick={() => saveRouteMutation.mutate({ start: start!, finish: finish!, mobility_profile: profile })}
+                disabled={saveRouteMutation.isPending}
+              >
+                {saveRouteMutation.isPending ? 'Сохраняем...' : 'Сохранить маршрут'}
+              </button>
+              {saveMessage && <div className="alert-success">{saveMessage}</div>}
+              {saveError && <div className="alert-error">{saveError}</div>}
+            </div>
+          )}
+
+          {savedRoutesQuery.isSuccess && savedRoutesQuery.data.length > 0 && (
+            <div className="saved-routes">
+              <h4>Сохраненные маршруты</h4>
+              <ul>
+                {savedRoutesQuery.data.map((route: SavedRoute) => (
+                  <li key={route.id}>
+                    <button className="btn btn-sm btn-secondary" onClick={() => handleShowSavedRoute(route)}>
+                      {route.start.latitude.toFixed(4)}, {route.start.longitude.toFixed(4)} → {route.finish.latitude.toFixed(4)}, {route.finish.longitude.toFixed(4)} · {(route.total_distance / 1000).toFixed(2)} км
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
