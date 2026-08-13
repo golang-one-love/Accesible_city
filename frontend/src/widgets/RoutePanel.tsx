@@ -14,10 +14,14 @@ export function RoutePanel({
   clickPoint,
   onPointSelected,
   onRouteResult,
+  collapsed,
+  onToggleCollapsed,
 }: {
   clickPoint: Coordinates | null
   onPointSelected: () => void
   onRouteResult?: (route: any) => void
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }) {
   const [start, setStart] = useState<Coordinates | null>(null)
   const [finish, setFinish] = useState<Coordinates | null>(null)
@@ -47,12 +51,13 @@ export function RoutePanel({
   }
 
   return (
-    <div className="route-panel">
-      <div className="route-panel-header">
-        <h3>🧭 Построить маршрут</h3>
-      </div>
+    <div className={`route-panel${collapsed ? ' collapsed' : ''}`}>
+      <button className="route-panel-toggle" onClick={onToggleCollapsed}>
+        <span className="route-panel-title">🧭 Построить маршрут</span>
+        <span className="route-panel-caret">{collapsed ? '▲' : '▼'}</span>
+      </button>
 
-      {clickPoint && (
+      {clickPoint && !collapsed && (
         <div className="route-pick-point">
           <p className="route-hint">Точка на карте: {clickPoint.latitude}, {clickPoint.longitude}</p>
           <div className="click-point-actions">
@@ -81,9 +86,10 @@ export function RoutePanel({
         </div>
       )}
 
-      <div className="route-form">
-        <div className="form-group">
-          <label>Точка начала</label>
+      {!collapsed && (
+        <div className="route-form">
+          <div className="form-group">
+            <label>Точка начала</label>
           {start ? (
             <div className="route-point-set">
               <span className="route-point-coords">{start.latitude}, {start.longitude}</span>
@@ -149,6 +155,7 @@ export function RoutePanel({
           </div>
         )}
       </div>
+        )}
     </div>
   )
 }

@@ -42,7 +42,7 @@ async def init_db() -> None:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("database not ready, retrying in 5s: %s", exc)
             await asyncio.sleep(5)
 
