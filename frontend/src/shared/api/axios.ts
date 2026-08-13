@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -40,7 +40,7 @@ api.interceptors.response.use(
           const parsed = JSON.parse(token)
           if (parsed.state?.refreshToken) {
             const response = await axios.post(
-              `${import.meta.env.VITE_API_BASE_URL || 'http://localhost/api'}/auth/refresh`,
+              `${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/refresh`,
               { refresh_token: parsed.state.refreshToken }
             )
             

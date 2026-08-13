@@ -1,7 +1,11 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
-import { Coordinates, MobilityProfile } from '@entities/route/types'
+import { Coordinates, MobilityProfile, RouteNode, SavedRoute } from '@entities/route/types'
+import { MapClickHandler } from '@shared/ui/MapClickHandler'
 
 const MOBILITY_PROFILES: { value: MobilityProfile; label: string; icon: string }[] = [
   { value: 'wheelchair', label: 'Инвалидное кресло', icon: '♿' },
@@ -10,30 +14,128 @@ const MOBILITY_PROFILES: { value: MobilityProfile; label: string; icon: string }
   { value: 'default', label: 'Обычный пешеход', icon: '🚶' },
 ]
 
+const MOSCOW_CENTER = [55.7558, 37.6173] as [number, number]
+
+const startIcon = L.divIcon({
+  className: 'route-point-marker',
+  html: '<span class="route-point-icon route-point-start">A</span>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+})
+
+const finishIcon = L.divIcon({
+  className: 'route-point-marker',
+  html: '<span class="route-point-icon route-point-finish">B</span>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+})
+
+const clickIcon = L.divIcon({
+  className: 'click-marker',
+  html: '<span class="click-marker-dot"></span>',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+})
+
+function pointToLatLng(p: Coordinates): [number, number] {
+  return [p.latitude, p.longitude]
+}
+
+function FitRouteBounds({ points }: { points: [number, number][] }) {
+  const map = useMap()
+  useEffect(() => {
+    if (points.length > 0) {
+      map.fitBounds(L.latLngBounds(points.map((p) => L.latLng(p[0], p[1]))), { padding: [50, 50] })
+    }
+  }, [map, points])
+  return null
+}
+
 export function RouteBuilderPage() {
   const [start, setStart] = useState<Coordinates | null>(null)
   const [finish, setFinish] = useState<Coordinates | null>(null)
+  const [clickPoint, setClickPoint] = useState<Coordinates | null>(null)
   const [profile, setProfile] = useState<MobilityProfile>('default')
   const [routeResult, setRouteResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const buildRouteMutation = useMutation({
-    mutationFn: async (params: { start: Coordinates; finish: Coordinates; profile: MobilityProfile }) => {
+    mutationFn: async (params: { start: Coordinates; finish: Coordinates; mobility_profile: MobilityProfile }) => {
       const response = await api.post('/routes/build', params)
       return response.data
     },
     onSuccess: (data) => {
       setRouteResult(data)
+      setError(null)
     },
-    onError: (error) => {
-      console.error('Route error:', error)
-      alert('Не удалось построить маршрут')
+    onError: (error: any) => {
+      setError(error.response?.data?.error || 'Не удалось построить маршрут')
+      setRouteResult(null)
     },
   })
 
-  const handleBuildRoute = () => {
-    if (!start || !finish) return
-    buildRouteMutation.mutate({ start, finish, profile })
+  const queryClient = useQueryClient()
+
+  const savedRoutesQuery = useQuery({
+    queryKey: ['saved-routes'],
+    queryFn: async () => {
+      const response = await api.get('/routes')
+      return response.data.routes as SavedRoute[]
+    },
+    retry: false,
+  })
+
+  const saveRouteMutation = useMutation({
+    mutationFn: async (params: { start: Coordinates; finish: Coordinates; mobility_profile: MobilityProfile }) => {
+      const response = await api.post('/routes/save', params)
+      return response.data
+    },
+    onSuccess: () => {
+      setSaveMessage('Маршрут сохранен')
+      setSaveError(null)
+      queryClient.invalidateQueries({ queryKey: ['saved-routes'] })
+    },
+    onError: (error: any) => {
+      setSaveError(error.response?.data?.error || 'Не удалось сохранить маршрут')
+      setSaveMessage(null)
+    },
+  })
+
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleShowSavedRoute = (route: SavedRoute) => {
+    setStart(route.start)
+    setFinish(route.finish)
+    setProfile(route.mobility_profile)
+    setRouteResult({
+      nodes: route.points,
+      total_distance: route.total_distance,
+      max_severity: route.max_severity,
+    })
+    setError(null)
   }
+
+  const handleMapClick = (point: Coordinates) => {
+    setClickPoint(point)
+  }
+
+  const handleSetStart = (point: Coordinates) => {
+    setStart(point)
+    setClickPoint(null)
+    setRouteResult(null)
+  }
+
+  const handleSetFinish = (point: Coordinates) => {
+    setFinish(point)
+    setClickPoint(null)
+    setRouteResult(null)
+  }
+
+  const routeNodes: [number, number][] = useMemo(
+    () => (routeResult?.nodes ?? []).map((n: RouteNode) => [n.latitude, n.longitude]),
+    [routeResult]
+  )
 
   return (
     <div className="route-page">
@@ -42,48 +144,33 @@ export function RouteBuilderPage() {
       </div>
 
       <div className="route-builder">
-        <div className="route-form-panel">
+        <div className="route-controls-panel">
           <div className="form-group">
-            <label>Откуда</label>
-            <div className="coords-input">
-              <input
-                type="number"
-                step="0.000001"
-                placeholder="Широта"
-                value={start?.latitude || ''}
-                onChange={(e) => setStart({ ...(start || { latitude: 0, longitude: 0 }), latitude: parseFloat(e.target.value) })}
-              />
-              <input
-                type="number"
-                step="0.000001"
-                placeholder="Долгота"
-                value={start?.longitude || ''}
-                onChange={(e) => setStart({ ...(start || { latitude: 0, longitude: 0 }), longitude: parseFloat(e.target.value) })}
-              />
-            </div>
-            <button className="btn btn-sm btn-secondary" onClick={() => navigator.geolocation.getCurrentPosition((pos) => setStart({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }))}>
-              Моя позиция
-            </button>
+            <label>Отсюда (A)</label>
+            {start ? (
+              <div className="route-point-set">
+                <span className="route-point-coords">{start.latitude}, {start.longitude}</span>
+                <button className="btn btn-sm btn-secondary" onClick={() => { setStart(null); setRouteResult(null) }}>
+                  Очистить
+                </button>
+              </div>
+            ) : (
+              <p className="route-hint">Кликните по карте и выберите «Отсюда»</p>
+            )}
           </div>
 
           <div className="form-group">
-            <label>Куда</label>
-            <div className="coords-input">
-              <input
-                type="number"
-                step="0.000001"
-                placeholder="Широта"
-                value={finish?.latitude || ''}
-                onChange={(e) => setFinish({ ...(finish || { latitude: 0, longitude: 0 }), latitude: parseFloat(e.target.value) })}
-              />
-              <input
-                type="number"
-                step="0.000001"
-                placeholder="Долгота"
-                value={finish?.longitude || ''}
-                onChange={(e) => setFinish({ ...(finish || { latitude: 0, longitude: 0 }), longitude: parseFloat(e.target.value) })}
-              />
-            </div>
+            <label>Сюда (B)</label>
+            {finish ? (
+              <div className="route-point-set">
+                <span className="route-point-coords">{finish.latitude}, {finish.longitude}</span>
+                <button className="btn btn-sm btn-secondary" onClick={() => { setFinish(null); setRouteResult(null) }}>
+                  Очистить
+                </button>
+              </div>
+            ) : (
+              <p className="route-hint">Кликните по карте и выберите «Сюда»</p>
+            )}
           </div>
 
           <div className="form-group">
@@ -102,13 +189,15 @@ export function RouteBuilderPage() {
             </div>
           </div>
 
-          <button 
-            className="btn btn-primary btn-block" 
-            onClick={handleBuildRoute}
+          <button
+            className="btn btn-primary btn-block"
+            onClick={() => buildRouteMutation.mutate({ start: start!, finish: finish!, mobility_profile: profile })}
             disabled={!start || !finish || buildRouteMutation.isPending}
           >
             {buildRouteMutation.isPending ? 'Строим маршрут...' : 'Построить маршрут'}
           </button>
+
+          {error && <div className="alert-error">{error}</div>}
 
           {routeResult && (
             <div className="route-result">
@@ -116,15 +205,82 @@ export function RouteBuilderPage() {
               <p>Расстояние: {(routeResult.total_distance / 1000).toFixed(2)} км</p>
               <p>Макс. серьезность препятствий: {routeResult.max_severity}/5</p>
               <p>Количество точек: {routeResult.nodes.length}</p>
+              <button
+                className="btn btn-success btn-block"
+                onClick={() => saveRouteMutation.mutate({ start: start!, finish: finish!, mobility_profile: profile })}
+                disabled={saveRouteMutation.isPending}
+              >
+                {saveRouteMutation.isPending ? 'Сохраняем...' : 'Сохранить маршрут'}
+              </button>
+              {saveMessage && <div className="alert-success">{saveMessage}</div>}
+              {saveError && <div className="alert-error">{saveError}</div>}
+            </div>
+          )}
+
+          {savedRoutesQuery.isSuccess && savedRoutesQuery.data.length > 0 && (
+            <div className="saved-routes">
+              <h4>Сохраненные маршруты</h4>
+              <ul>
+                {savedRoutesQuery.data.map((route: SavedRoute) => (
+                  <li key={route.id}>
+                    <button className="btn btn-sm btn-secondary" onClick={() => handleShowSavedRoute(route)}>
+                      {route.start.latitude.toFixed(4)}, {route.start.longitude.toFixed(4)} → {route.finish.latitude.toFixed(4)}, {route.finish.longitude.toFixed(4)} · {(route.total_distance / 1000).toFixed(2)} км
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
 
         <div className="route-map-panel">
-          <div className="map-placeholder">
-            <p>Карта маршрута будет здесь</p>
-            <p className="hint">Кликните по карте для выбора точек</p>
-          </div>
+          <MapContainer
+            center={MOSCOW_CENTER}
+            zoom={13}
+            scrollWheelZoom={true}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            <MapClickHandler onMapClick={handleMapClick} />
+
+            {clickPoint && <Marker position={pointToLatLng(clickPoint)} icon={clickIcon} />}
+
+            {start && <Marker position={pointToLatLng(start)} icon={startIcon} />}
+            {finish && <Marker position={pointToLatLng(finish)} icon={finishIcon} />}
+
+            {routeNodes.length > 1 && (
+              <Polyline
+                positions={routeNodes}
+                pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.85 }}
+              />
+            )}
+
+            {routeNodes.length > 1 && <FitRouteBounds points={routeNodes} />}
+          </MapContainer>
+
+          {clickPoint && (
+            <div className="click-point-panel">
+              <div className="click-point-coords">
+                <span>Широта: <b>{clickPoint.latitude}</b></span>
+                <span>Долгота: <b>{clickPoint.longitude}</b></span>
+              </div>
+              <div className="click-point-actions">
+                <button className="btn btn-primary btn-sm" onClick={() => handleSetStart(clickPoint)}>
+                  Отсюда
+                </button>
+                <button className="btn btn-success btn-sm" onClick={() => handleSetFinish(clickPoint)}>
+                  Сюда
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setClickPoint(null)}>
+                  Скрыть
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

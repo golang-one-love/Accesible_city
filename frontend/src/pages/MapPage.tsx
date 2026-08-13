@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Popup, useMapEvents } from 'react-leaflet'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { MapContainer, TileLayer, Popup, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
-import { Barrier, BarrierType, BarrierStatus, Severity } from '@entities/barrier/types'
+import { Barrier, BarrierType, BarrierStatus, Severity, Coordinates } from '@entities/barrier/types'
+import { MapClickHandler } from '@shared/ui/MapClickHandler'
 import { BarrierMarker } from '@widgets/BarrierMarker'
 import { BarrierFormModal } from '@features/barriers/BarrierFormModal'
 import { RoutePanel } from '@widgets/RoutePanel'
+import { VolunteerPanel } from '@widgets/VolunteerPanel'
 import { useBarrierStore } from '@features/barriers/store'
 
 const iconDefault = L.icon({
@@ -22,22 +24,35 @@ const iconDefault = L.icon({
 
 L.Marker.prototype.options.icon = iconDefault
 
-const MOSCOW_CENTER = [55.7558, 37.6173] as [number, number]
+const clickIcon = L.divIcon({
+  className: 'click-marker',
+  html: '<span class="click-marker-dot"></span>',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+})
 
-function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
-  useMapEvents({
-    click: () => onMapClick(),
-  })
-  return null
-}
+const MOSCOW_CENTER = [55.7558, 37.6173] as [number, number]
 
 interface MapViewProps {
   selectedBarrier: Barrier | null
   onSelectBarrier: (barrier: Barrier | null) => void
   onCloseModal: () => void
+  onMapClick: (point: Coordinates) => void
+  clickPoint: Coordinates | null
+  routeNodes: [number, number][]
 }
 
-function MapView({ selectedBarrier, onSelectBarrier, onCloseModal }: MapViewProps) {
+function FitRouteBounds({ points }: { points: [number, number][] }) {
+  const map = useMap()
+  useEffect(() => {
+    if (points.length > 0) {
+      map.fitBounds(L.latLngBounds(points.map((p) => L.latLng(p[0], p[1]))), { padding: [50, 50] })
+    }
+  }, [map, points])
+  return null
+}
+
+function MapView({ selectedBarrier, onSelectBarrier, onCloseModal, onMapClick, clickPoint, routeNodes }: MapViewProps) {
   const { barriers, setBarriers, filters } = useBarrierStore()
   const mapRef = useRef<L.Map | null>(null)
 
@@ -81,9 +96,13 @@ function MapView({ selectedBarrier, onSelectBarrier, onCloseModal }: MapViewProp
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       
-      <MapClickHandler onMapClick={() => onSelectBarrier(null)} />
+      <MapClickHandler onMapClick={onMapClick} />
 
-      {barriers.map((barrier) => (
+      {clickPoint && <Marker position={[clickPoint.latitude, clickPoint.longitude]} icon={clickIcon} />}
+
+      {barriers
+        .filter((barrier) => filters.status || barrier.status !== 'rejected')
+        .map((barrier) => (
         <BarrierMarker
           key={barrier.id}
           barrier={barrier}
@@ -104,10 +123,22 @@ function MapView({ selectedBarrier, onSelectBarrier, onCloseModal }: MapViewProp
             </p>
             <p>{selectedBarrier.description || 'Нет описания'}</p>
             <p className={`status-badge status-${selectedBarrier.status}`}>{getStatusLabel(selectedBarrier.status)}</p>
+            <p className="popup-coords">
+              Ш: {selectedBarrier.coordinates.latitude.toFixed(5)}, Д: {selectedBarrier.coordinates.longitude.toFixed(5)}
+            </p>
             <button onClick={() => onCloseModal()} className="btn btn-sm">Закрыть</button>
           </div>
         </Popup>
       )}
+
+      {routeNodes.length > 1 && (
+        <Polyline
+          positions={routeNodes}
+          pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.85 }}
+        />
+      )}
+
+      {routeNodes.length > 1 && <FitRouteBounds points={routeNodes} />}
     </MapContainer>
   )
 }
@@ -152,11 +183,54 @@ function MapControls({ onAddBarrier }: { onAddBarrier: () => void }) {
   )
 }
 
+function ClickPointPanel({ point, onPlaceBarrier, onHide }: {
+  point: Coordinates
+  onPlaceBarrier: () => void
+  onHide: () => void
+}) {
+  return (
+    <div className="click-point-panel">
+      <div className="click-point-coords">
+        <span>Широта: <b>{point.latitude.toFixed(6)}</b></span>
+        <span>Долгота: <b>{point.longitude.toFixed(6)}</b></span>
+      </div>
+      <div className="click-point-actions">
+        <button className="btn btn-primary btn-sm" onClick={onPlaceBarrier}>Поставить барьер</button>
+        <button className="btn btn-secondary btn-sm" onClick={onHide}>Скрыть</button>
+      </div>
+    </div>
+  )
+}
+
 export function MapPage() {
   const [selectedBarrier, setSelectedBarrier] = useState<Barrier | null>(null)
+  const [clickPoint, setClickPoint] = useState<Coordinates | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [routeResult, setRouteResult] = useState<any>(null)
+
+  const handleMapClick = (point: Coordinates) => {
+    setSelectedBarrier(null)
+    setClickPoint(point)
+  }
+
+  const routeNodes: [number, number][] = useMemo(
+    () => (routeResult?.nodes ?? []).map((n: any) => [n.latitude, n.longitude]),
+    [routeResult]
+  )
 
   const handleAddBarrier = () => {
     setSelectedBarrier(null)
+    setClickPoint(null)
+    setFormOpen(true)
+  }
+
+  const handlePlaceBarrier = () => {
+    setFormOpen(true)
+  }
+
+  const closeForm = () => {
+    setFormOpen(false)
+    setClickPoint(null)
   }
 
   return (
@@ -166,19 +240,37 @@ export function MapPage() {
           selectedBarrier={selectedBarrier}
           onSelectBarrier={setSelectedBarrier}
           onCloseModal={() => setSelectedBarrier(null)}
+          onMapClick={handleMapClick}
+          clickPoint={clickPoint}
+          routeNodes={routeNodes}
         />
         <MapControls onAddBarrier={handleAddBarrier} />
+        {clickPoint && !formOpen && (
+          <ClickPointPanel
+            point={clickPoint}
+            onPlaceBarrier={handlePlaceBarrier}
+            onHide={() => setClickPoint(null)}
+          />
+        )}
       </div>
-      
-      {selectedBarrier && (
+
+      {formOpen && (
         <BarrierFormModal
-          barrier={selectedBarrier}
-          onClose={() => setSelectedBarrier(null)}
-          onSave={() => setSelectedBarrier(null)}
+          initialCoordinates={clickPoint ?? undefined}
+          onClose={closeForm}
+          onSave={() => {
+            closeForm()
+            setSelectedBarrier(null)
+          }}
         />
       )}
       
-      <RoutePanel />
+      <VolunteerPanel />
+      <RoutePanel
+        clickPoint={clickPoint}
+        onPointSelected={() => setClickPoint(null)}
+        onRouteResult={setRouteResult}
+      />
     </div>
   )
 }

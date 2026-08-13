@@ -51,6 +51,7 @@ class BarrierPhotoResponse(BaseModel):
     size_bytes: int
     uploaded_by: UUID
     created_at: datetime
+    presigned_url: str | None = None
 
     class Config:
         from_attributes = True

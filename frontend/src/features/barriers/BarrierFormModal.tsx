@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Barrier, BarrierType, Severity, CreateBarrierRequest } from '@entities/barrier/types'
+import { BarrierType, Severity, Coordinates } from '@entities/barrier/types'
 import { api } from '@shared/api/axios'
 import { useBarrierStore } from '@features/barriers/store'
 
 interface BarrierFormModalProps {
-  barrier: Barrier | null
+  initialCoordinates?: Coordinates
   onClose: () => void
   onSave: () => void
 }
@@ -27,37 +27,59 @@ const SEVERITY_OPTIONS: { value: Severity; label: string }[] = [
   { value: 5, label: '5 - Блокирующая' },
 ]
 
-export function BarrierFormModal({ barrier, onClose, onSave }: BarrierFormModalProps) {
-  const { addBarrier, updateBarrier } = useBarrierStore()
-  const [formData, setFormData] = useState<CreateBarrierRequest>({
+export function BarrierFormModal({ initialCoordinates, onClose, onSave }: BarrierFormModalProps) {
+  const { addBarrier } = useBarrierStore()
+  const [formData, setFormData] = useState<{
+    type: BarrierType
+    latitude: string
+    longitude: string
+    description: string
+    severity: Severity
+  }>({
     type: 'high_curb',
-    coordinates: { latitude: 55.7558, longitude: 37.6173 },
+    latitude: initialCoordinates ? String(initialCoordinates.latitude) : '',
+    longitude: initialCoordinates ? String(initialCoordinates.longitude) : '',
     description: '',
     severity: 2,
   })
+  const [photos, setPhotos] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const isEditing = barrier !== null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsSubmitting(true)
 
+    const latitude = parseFloat(formData.latitude)
+    const longitude = parseFloat(formData.longitude)
+    if (isNaN(latitude) || isNaN(longitude)) {
+      setError('Укажите широту и долготу')
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      if (isEditing) {
-        // For editing, we'd need an update endpoint
-        // This is a simplified version
-        await api.patch(`/barriers/${barrier.id}`, formData)
-        updateBarrier(barrier.id, formData)
-      } else {
-        const response = await api.post('/barriers', formData)
-        addBarrier(response.data)
+      const response = await api.post('/barriers', {
+        type: formData.type,
+        coordinates: { latitude, longitude },
+        description: formData.description,
+        severity: formData.severity,
+      })
+      const created = response.data
+      addBarrier(created)
+
+      for (const file of photos) {
+        const formDataBody = new FormData()
+        formDataBody.append('file', file)
+        await api.post(`/barriers/${created.id}/photos`, formDataBody, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
       }
+
       onSave()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка при сохранении')
+      setError(err.response?.data?.error || err.response?.data?.detail || 'Ошибка при сохранении')
     } finally {
       setIsSubmitting(false)
     }
@@ -67,7 +89,7 @@ export function BarrierFormModal({ barrier, onClose, onSave }: BarrierFormModalP
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal barrier-form-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{isEditing ? 'Редактировать барьер' : 'Добавить барьер'}</h3>
+          <h3>Добавить барьер</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         
@@ -94,12 +116,9 @@ export function BarrierFormModal({ barrier, onClose, onSave }: BarrierFormModalP
               <input
                 id="latitude"
                 type="number"
-                step="0.000001"
-                value={formData.coordinates.latitude}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  coordinates: { ...formData.coordinates, latitude: parseFloat(e.target.value) } 
-                })}
+                step="any"
+                value={formData.latitude}
+                onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
                 required
                 min="-90"
                 max="90"
@@ -110,12 +129,9 @@ export function BarrierFormModal({ barrier, onClose, onSave }: BarrierFormModalP
               <input
                 id="longitude"
                 type="number"
-                step="0.000001"
-                value={formData.coordinates.longitude}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  coordinates: { ...formData.coordinates, longitude: parseFloat(e.target.value) } 
-                })}
+                step="any"
+                value={formData.longitude}
+                onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
                 required
                 min="-180"
                 max="180"
@@ -148,12 +164,33 @@ export function BarrierFormModal({ barrier, onClose, onSave }: BarrierFormModalP
             />
           </div>
 
+          <div className="form-group">
+            <label htmlFor="photos">Фотографии</label>
+            <input
+              id="photos"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+            />
+            {photos.length > 0 && (
+              <div className="photo-previews">
+                {photos.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="photo-preview-item">
+                    <img src={URL.createObjectURL(file)} alt={file.name} className="photo-preview-img" />
+                    <span className="photo-preview-name">{file.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
               Отмена
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Сохранение...' : (isEditing ? 'Сохранить' : 'Добавить')}
+              {isSubmitting ? 'Сохранение...' : 'Добавить'}
             </button>
           </div>
         </form>

@@ -1,20 +1,154 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { api } from '@shared/api/axios'
+import { ModerationRequest, ModerationStatus } from '@entities/moderation/types'
+import { Barrier, BarrierPhoto } from '@entities/barrier/types'
 
-interface ModerationRequest {
-  id: string
-  barrier_id: string
-  reporter_id: string
-  status: 'pending' | 'approved' | 'rejected'
-  moderator_id: string | null
-  moderator_comment: string
-  created_at: string
-  updated_at: string
-  reviewed_at: string | null
+function PhotoLightbox({ photo, onClose }: { photo: BarrierPhoto; onClose: () => void }) {
+  return (
+    <div className="photo-lightbox" onClick={onClose}>
+      <button className="photo-lightbox-close" aria-label="Закрыть" onClick={onClose}>
+        ✕
+      </button>
+      <img
+        src={photo.presigned_url}
+        alt={photo.original_filename}
+        className="photo-lightbox-image"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  )
 }
 
-type ModerationStatus = 'pending' | 'approved' | 'rejected'
+function useBarrier(barrierId: string | null) {
+  return useQuery({
+    queryKey: ['moderation-barrier', barrierId],
+    queryFn: async () => {
+      const response = await api.get(`/barriers/${barrierId}`)
+      return response.data as Barrier
+    },
+    enabled: !!barrierId,
+  })
+}
+
+function ModerationCard({ request, onReviewed }: { request: ModerationRequest; onReviewed: () => void }) {
+  const { data: barrier, isLoading } = useBarrier(request.barrier_id)
+  const [comment, setComment] = useState('')
+  const [viewingPhoto, setViewingPhoto] = useState<BarrierPhoto | null>(null)
+
+  const destroy = () => {
+    setComment('')
+    onReviewed()
+  }
+
+  return (
+    <div className="moderation-card">
+      <div className="moderation-card-header">
+        <span className="request-id">#{request.id.slice(0, 8)}</span>
+        <span className="request-date">
+          {new Date(request.created_at).toLocaleString('ru-RU')}
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="spinner" />
+      ) : barrier ? (
+        <>
+          <div className="moderation-card-info">
+            <p className="moderation-card-coords">
+              Ш: {barrier.coordinates.latitude.toFixed(5)}, Д: {barrier.coordinates.longitude.toFixed(5)}
+            </p>
+            <p className="moderation-card-desc">
+              {barrier.description || 'Описание отсутствует'}
+            </p>
+            <p className="moderation-card-meta">
+              <span className="role-badge">{barrier.type}</span>
+              <span className="role-badge">severity: {barrier.severity}</span>
+            </p>
+          </div>
+
+          {barrier.photos.length > 0 ? (
+            <div className="moderation-photos">
+              {barrier.photos.map((photo) => (
+                <img
+                  key={photo.id}
+                  src={photo.presigned_url}
+                  alt={photo.original_filename}
+                  className="moderation-photo"
+                  onClick={() => setViewingPhoto(photo)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">Фотографии не приложены</p>
+          )}
+
+          {viewingPhoto && (
+            <PhotoLightbox photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />
+          )}
+
+          {request.status === 'pending' && (
+            <div className="moderation-card-actions">
+              <div className="form-group">
+                <label htmlFor={`reject-comment-${request.id}`}>
+                  Комментарий к решению
+                </label>
+                <textarea
+                  id={`reject-comment-${request.id}`}
+                  rows={2}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Причина отклонения / замечание..."
+                />
+              </div>
+              <div className="request-actions">
+                <ModerationActionButton
+                  requestId={request.id}
+                  action="approve"
+                  comment={comment}
+                  onDone={destroy}
+                />
+                <ModerationActionButton
+                  requestId={request.id}
+                  action="reject"
+                  comment={comment}
+                  onDone={destroy}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="alert-error">Барьер не найден</p>
+      )}
+    </div>
+  )
+}
+
+function ModerationActionButton({ requestId, action, comment, onDone }: {
+  requestId: string
+  action: 'approve' | 'reject'
+  comment: string
+  onDone: () => void
+}) {
+  const mutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`/moderation/queue/${requestId}/${action}`, { comment })
+    },
+    onSuccess: onDone,
+  })
+
+  const isApprove = action === 'approve'
+  return (
+    <button
+      className={`btn ${isApprove ? 'btn-success' : 'btn-danger'} btn-sm`}
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+    >
+      {mutation.isPending ? 'Сохранение...' : isApprove ? 'Одобрить' : 'Отклонить'}
+    </button>
+  )
+}
 
 export function ModerationQueuePage() {
   const [statusFilter, setStatusFilter] = useState<ModerationStatus | 'all'>('all')
@@ -28,20 +162,6 @@ export function ModerationQueuePage() {
       const response = await api.get(`/moderation/queue?${params.toString()}`)
       return response.data
     },
-  })
-
-  const approveMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.post(`/moderation/queue/${id}/approve`, { comment: '' })
-    },
-    onSuccess: () => refetch(),
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.post(`/moderation/queue/${id}/reject`, { comment: '' })
-    },
-    onSuccess: () => refetch(),
   })
 
   const getStatusLabel = (status: ModerationStatus) => ({
@@ -84,37 +204,17 @@ export function ModerationQueuePage() {
           {data?.requests.map((request: ModerationRequest) => (
             <div key={request.id} className="moderation-item">
               <div className="request-info">
-                <span className="request-id">#{request.id.slice(0, 8)}</span>
-                <span 
-                  className="request-status" 
+                <span
+                  className="request-status"
                   style={{ backgroundColor: getStatusColor(request.status) }}
                 >
                   {getStatusLabel(request.status)}
                 </span>
-                <span className="request-date">
-                  {new Date(request.created_at).toLocaleString('ru-RU')}
-                </span>
-              </div>
-              <div className="request-actions">
-                {request.status === 'pending' && (
-                  <>
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={() => approveMutation.mutate(request.id)}
-                      disabled={approveMutation.isPending}
-                    >
-                      Одобрить
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => rejectMutation.mutate(request.id)}
-                      disabled={rejectMutation.isPending}
-                    >
-                      Отклонить
-                    </button>
-                  </>
+                {request.moderator_comment && (
+                  <span className="request-comment">{request.moderator_comment}</span>
                 )}
               </div>
+              <ModerationCard request={request} onReviewed={() => refetch()} />
             </div>
           ))}
         </div>

@@ -46,8 +46,10 @@ func (m *AuthMiddleware) RequireAuth() echo.MiddlewareFunc {
 func (m *AuthMiddleware) RequireRoles(roles ...entity.Role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			roleStr := c.Get("user_role").(string)
-			userRole := entity.Role(roleStr)
+			userRole, ok := c.Get("user_role").(entity.Role)
+			if !ok {
+				return c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid token"})
+			}
 
 			for _, r := range roles {
 				if userRole == r {
@@ -64,5 +66,5 @@ func GetUserID(c echo.Context) string {
 }
 
 func GetUserRole(c echo.Context) entity.Role {
-	return entity.Role(c.Get("user_role").(string))
+	return c.Get("user_role").(entity.Role)
 }

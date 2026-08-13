@@ -69,7 +69,8 @@ export function NotificationsPage() {
       try {
         const parsed = JSON.parse(token)
         if (parsed.state?.accessToken) {
-          const wsUrl = `ws://localhost/api/notifications/ws?token=${parsed.state.accessToken}`
+          const wsProto = location.protocol === 'https:' ? 'wss' : 'ws'
+          const wsUrl = `${wsProto}://${location.host}/api/notifications/ws?token=${parsed.state.accessToken}`
           const websocket = new WebSocket(wsUrl)
           websocket.onmessage = (event) => {
             const msg = JSON.parse(event.data)

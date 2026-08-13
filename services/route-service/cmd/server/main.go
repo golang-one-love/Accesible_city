@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +12,7 @@ import (
 
 	httpapiv1 "github.com/accessible-path/route-service/internal/adapters/in/http"
 	"github.com/accessible-path/route-service/internal/adapters/out/cache"
+	"github.com/accessible-path/route-service/internal/adapters/out/eventbus"
 	"github.com/accessible-path/route-service/internal/adapters/out/external"
 	"github.com/accessible-path/route-service/internal/adapters/out/postgres"
 	"github.com/accessible-path/route-service/internal/application/usecase"
@@ -28,15 +30,19 @@ func main() {
 
 	cfg := loadConfig()
 
-	pool, err := pgxpool.New(context.Background(), cfg.databaseURL())
+	poolConfig, err := pgxpool.ParseConfig(cfg.databaseURL())
+	if err != nil {
+		logger.Fatal("failed to parse database config", zap.Error(err))
+	}
+	poolConfig.MaxConns = 3
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		logger.Fatal("failed to connect to database", zap.Error(err))
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
-		logger.Fatal("failed to ping database", zap.Error(err))
-	}
+	waitForDB(logger, pool)
 
 	if err := postgres.EnsureSchema(context.Background(), pool); err != nil {
 		logger.Fatal("failed to ensure schema", zap.Error(err))
@@ -44,18 +50,53 @@ func main() {
 
 	graphCache := cache.NewMemoryGraphCache()
 	graphRepo := postgres.NewPostgresGraphRepository(pool)
+	routeRepo := postgres.NewPostgresRouteRepository(pool)
 
-	graph, err := graphRepo.LoadGraph()
-	if err != nil {
-		logger.Warn("no cached graph found, creating default grid", zap.Error(err))
-		graph = createDefaultGrid()
-	}
-	graphCache.Set(graph)
+	redisEventBus := eventbus.NewRedisEventBus(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
 
+	osmClient := external.NewOSMClient(cfg.OSMOverpassURL)
 	barrierClient := external.NewBarrierClient(cfg.BarrierServiceURL)
 
-	router := service.NewRouter(graph, barrierClient)
-	routeUseCase := usecase.NewRouteUseCase(router)
+	router := service.NewRouter(entity.NewGraph(), barrierClient)
+	routeUseCase := usecase.NewRouteUseCase(router, graphRepo, routeRepo, osmClient, redisEventBus, barrierClient)
+
+	go func() {
+		if err := redisEventBus.Subscribe("barrier.approved", "route-group", "route-consumer-approved", func(event map[string]interface{}) {
+			if err := routeUseCase.HandleBarrierEvent(event); err != nil {
+				logger.Error("handle barrier.approved reroute", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.approved consumer error", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if err := redisEventBus.Subscribe("barrier.resolved", "route-group", "route-consumer-resolved", func(event map[string]interface{}) {
+			if err := routeUseCase.HandleBarrierEvent(event); err != nil {
+				logger.Error("handle barrier.resolved reroute", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.resolved consumer error", zap.Error(err))
+		}
+	}()
+
+	graph, err := graphRepo.LoadGraph()
+	if err != nil || len(graph.Nodes) == 0 {
+		logger.Warn("no cached graph found, importing OSM roads...", zap.Error(err))
+		if impErr := routeUseCase.ImportOSM(cfg.OSMDefaultBBox); impErr != nil {
+			logger.Warn("OSM import failed, falling back to default grid", zap.Error(impErr))
+			graph = createDefaultGrid()
+		} else {
+			graph, err = graphRepo.LoadGraph()
+			if err != nil || len(graph.Nodes) == 0 {
+				logger.Warn("failed to reload imported graph, using default grid", zap.Error(err))
+				graph = createDefaultGrid()
+			}
+		}
+	}
+	router.SetGraph(graph)
+	graphCache.Set(graph)
+
 	routeHandler := httpapiv1.NewRouteHandler(routeUseCase)
 
 	e := echo.New()
@@ -94,13 +135,19 @@ func main() {
 }
 
 type config struct {
-	Port               string
-	PostgresHost       string
-	PostgresPort       string
-	PostgresUser       string
-	PostgresPassword   string
-	PostgresDB         string
-	BarrierServiceURL  string
+	Port              string
+	PostgresHost      string
+	PostgresPort      string
+	PostgresUser      string
+	PostgresPassword  string
+	PostgresDB        string
+	PostgresSSLMode   string
+	BarrierServiceURL string
+	OSMOverpassURL    string
+	OSMDefaultBBox    string
+	RedisAddr         string
+	RedisPassword     string
+	RedisDB           int
 }
 
 func loadConfig() config {
@@ -111,12 +158,40 @@ func loadConfig() config {
 		PostgresUser:      getEnv("POSTGRES_USER", "route_user"),
 		PostgresPassword:  getEnv("POSTGRES_PASSWORD", "route_pass"),
 		PostgresDB:        getEnv("POSTGRES_DB", "route_db"),
+		PostgresSSLMode:   getEnv("POSTGRES_SSLMODE", "disable"),
 		BarrierServiceURL: getEnv("BARRIER_SERVICE_URL", "http://barrier-service:8000"),
+		OSMOverpassURL:    getEnv("OSM_OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
+		OSMDefaultBBox:    getEnv("OSM_DEFAULT_BBOX", "55.7000,37.5200,55.8000,37.7200"),
+		RedisAddr:         getEnv("REDIS_HOST", "localhost") + ":" + getEnv("REDIS_PORT", "6379"),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		RedisDB:           0,
+	}
+}
+
+func waitForDB(logger *zap.Logger, pool *pgxpool.Pool) {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := pool.Ping(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		logger.Warn("database not ready, retrying in 5s", zap.Error(err))
+		time.Sleep(5 * time.Second)
 	}
 }
 
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.PostgresUser, c.PostgresPassword),
+		Host:   c.PostgresHost + ":" + c.PostgresPort,
+		Path:   "/" + c.PostgresDB,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.PostgresSSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func getEnv(key, defaultValue string) string {

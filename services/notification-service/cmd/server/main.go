@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,15 +26,19 @@ func main() {
 
 	cfg := loadConfig()
 
-	pool, err := pgxpool.New(context.Background(), cfg.databaseURL())
+	poolConfig, err := pgxpool.ParseConfig(cfg.databaseURL())
+	if err != nil {
+		logger.Fatal("failed to parse database config", zap.Error(err))
+	}
+	poolConfig.MaxConns = 3
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		logger.Fatal("failed to connect to database", zap.Error(err))
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
-		logger.Fatal("failed to ping database", zap.Error(err))
-	}
+	waitForDB(logger, pool)
 
 	if err := postgres.EnsureSchema(context.Background(), pool); err != nil {
 		logger.Fatal("failed to ensure schema", zap.Error(err))
@@ -66,6 +71,26 @@ func main() {
 			}
 		}); err != nil {
 			logger.Error("barrier.resolved consumer error", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if err := redisEventBus.Subscribe("barrier.rejected", "notification-group", "notification-consumer-4", func(event map[string]interface{}) {
+			if err := notificationService.HandleBarrierRejected(event); err != nil {
+				logger.Error("handle barrier.rejected", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.rejected consumer error", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if err := redisEventBus.Subscribe("route.updated", "notification-group", "notification-consumer-3", func(event map[string]interface{}) {
+			if err := notificationService.HandleRouteUpdated(event); err != nil {
+				logger.Error("handle route.updated", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("route.updated consumer error", zap.Error(err))
 		}
 	}()
 
@@ -110,6 +135,7 @@ type config struct {
 	PostgresUser     string
 	PostgresPassword string
 	PostgresDB       string
+	PostgresSSLMode  string
 	RedisAddr        string
 	RedisPassword    string
 	RedisDB          int
@@ -124,6 +150,7 @@ func loadConfig() config {
 		PostgresUser:     getEnv("POSTGRES_USER", "notification_user"),
 		PostgresPassword: getEnv("POSTGRES_PASSWORD", "notification_pass"),
 		PostgresDB:       getEnv("POSTGRES_DB", "notification_db"),
+		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 		RedisAddr:        getEnv("REDIS_HOST", "localhost") + ":" + getEnv("REDIS_PORT", "6379"),
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
 		RedisDB:          0,
@@ -131,8 +158,30 @@ func loadConfig() config {
 	}
 }
 
+func waitForDB(logger *zap.Logger, pool *pgxpool.Pool) {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := pool.Ping(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		logger.Warn("database not ready, retrying in 5s", zap.Error(err))
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.PostgresUser, c.PostgresPassword),
+		Host:   c.PostgresHost + ":" + c.PostgresPort,
+		Path:   "/" + c.PostgresDB,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.PostgresSSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func getEnv(key, defaultValue string) string {

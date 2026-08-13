@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,7 +15,9 @@ import (
 	"github.com/accessible-path/auth-service/internal/adapters/out/jwt"
 	"github.com/accessible-path/auth-service/internal/adapters/out/postgres"
 	"github.com/accessible-path/auth-service/internal/application/usecase"
+	"github.com/accessible-path/auth-service/internal/domain/entity"
 	"github.com/accessible-path/auth-service/internal/domain/service"
+	"github.com/accessible-path/auth-service/internal/domain/valueobject"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -25,15 +30,19 @@ func main() {
 
 	cfg := loadConfig()
 
-	pool, err := pgxpool.New(context.Background(), cfg.databaseURL())
+	poolConfig, err := pgxpool.ParseConfig(cfg.databaseURL())
+	if err != nil {
+		logger.Fatal("failed to parse database config", zap.Error(err))
+	}
+	poolConfig.MaxConns = 3
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		logger.Fatal("failed to connect to database", zap.Error(err))
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
-		logger.Fatal("failed to ping database", zap.Error(err))
-	}
+	waitForDB(logger, pool)
 
 	if err := postgres.EnsureSchema(context.Background(), pool); err != nil {
 		logger.Fatal("failed to ensure schema", zap.Error(err))
@@ -50,9 +59,15 @@ func main() {
 	}
 
 	userRepo := postgres.NewUserRepository(pool)
+	roleAppRepo := postgres.NewRoleApplicationRepository(pool)
+
+	if err := seedModerator(userRepo, logger, cfg); err != nil {
+		logger.Fatal("failed to seed moderator", zap.Error(err))
+	}
 
 	authService := service.NewAuthService(
 		userRepo,
+		roleAppRepo,
 		tokenGen,
 		cfg.BCryptCost,
 		cfg.JWTAccessTTL,
@@ -70,7 +85,7 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 	}))
 
@@ -99,17 +114,20 @@ func main() {
 }
 
 type config struct {
-	Port                string
-	PostgresHost        string
-	PostgresPort        string
-	PostgresUser        string
-	PostgresPassword    string
-	PostgresDB          string
-	JWTPrivateKeyPath   string
-	JWTPublicKeyPath    string
-	JWTAccessTTL        time.Duration
-	JWTRefreshTTL       time.Duration
-	BCryptCost          int
+	Port                   string
+	PostgresHost           string
+	PostgresPort           string
+	PostgresUser           string
+	PostgresPassword       string
+	PostgresDB             string
+	PostgresSSLMode        string
+	JWTPrivateKeyPath      string
+	JWTPublicKeyPath       string
+	JWTAccessTTL           time.Duration
+	JWTRefreshTTL          time.Duration
+	BCryptCost             int
+	SeedModeratorEmail     string
+	SeedModeratorPassword  string
 }
 
 func loadConfig() config {
@@ -117,22 +135,82 @@ func loadConfig() config {
 	refreshTTL, _ := time.ParseDuration(getEnv("JWT_REFRESH_TTL", "168h"))
 
 	return config{
-		Port:                getEnv("PORT", "8081"),
-		PostgresHost:        getEnv("POSTGRES_HOST", "localhost"),
-		PostgresPort:        getEnv("POSTGRES_PORT", "5432"),
-		PostgresUser:        getEnv("POSTGRES_USER", "auth_user"),
-		PostgresPassword:    getEnv("POSTGRES_PASSWORD", "auth_pass"),
-		PostgresDB:          getEnv("POSTGRES_DB", "auth_db"),
-		JWTPrivateKeyPath:   getEnv("JWT_PRIVATE_KEY_PATH", "/keys/private.pem"),
-		JWTPublicKeyPath:    getEnv("JWT_PUBLIC_KEY_PATH", "/keys/public.pem"),
-		JWTAccessTTL:        accessTTL,
-		JWTRefreshTTL:       refreshTTL,
-		BCryptCost:          12,
+		Port:                  getEnv("PORT", "8081"),
+		PostgresHost:          getEnv("POSTGRES_HOST", "localhost"),
+		PostgresPort:          getEnv("POSTGRES_PORT", "5432"),
+		PostgresUser:          getEnv("POSTGRES_USER", "auth_user"),
+		PostgresPassword:      getEnv("POSTGRES_PASSWORD", "auth_pass"),
+		PostgresDB:            getEnv("POSTGRES_DB", "auth_db"),
+		PostgresSSLMode:       getEnv("POSTGRES_SSLMODE", "disable"),
+		JWTPrivateKeyPath:     getEnv("JWT_PRIVATE_KEY_PATH", "/keys/private.pem"),
+		JWTPublicKeyPath:      getEnv("JWT_PUBLIC_KEY_PATH", "/keys/public.pem"),
+		JWTAccessTTL:          accessTTL,
+		JWTRefreshTTL:         refreshTTL,
+		BCryptCost:            12,
+		SeedModeratorEmail:    getEnv("SEED_MODERATOR_EMAIL", "moderator@accessible.city"),
+		SeedModeratorPassword: getEnv("SEED_MODERATOR_PASSWORD", "Moderator2026!"),
+	}
+}
+
+func waitForDB(logger *zap.Logger, pool *pgxpool.Pool) {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := pool.Ping(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		logger.Warn("database not ready, retrying in 5s", zap.Error(err))
+		time.Sleep(5 * time.Second)
 	}
 }
 
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.PostgresUser, c.PostgresPassword),
+		Host:   c.PostgresHost + ":" + c.PostgresPort,
+		Path:   "/" + c.PostgresDB,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.PostgresSSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func seedModerator(userRepo *postgres.UserRepository, logger *zap.Logger, cfg config) error {
+	email, err := valueobject.NewEmail(cfg.SeedModeratorEmail)
+	if err != nil {
+		return fmt.Errorf("invalid seed moderator email: %w", err)
+	}
+
+	_, err = userRepo.GetByEmail(email)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, service.ErrUserNotFound) {
+		return err
+	}
+
+	password, err := valueobject.NewPassword(cfg.SeedModeratorPassword)
+	if err != nil {
+		return fmt.Errorf("invalid seed moderator password: %w", err)
+	}
+
+	hash, err := password.Hash(cfg.BCryptCost)
+	if err != nil {
+		return fmt.Errorf("hash seed moderator password: %w", err)
+	}
+
+	user := entity.NewUser(email, hash.String(), entity.RoleModerator)
+	user.UpdateNickname("Модератор")
+
+	if err := userRepo.Create(user); err != nil {
+		return fmt.Errorf("create seed moderator: %w", err)
+	}
+
+	logger.Info("seeded moderator user", zap.String("email", email.String()))
+	return nil
 }
 
 func getEnv(key, defaultValue string) string {

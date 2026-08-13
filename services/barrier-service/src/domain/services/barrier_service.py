@@ -124,8 +124,8 @@ class BarrierService:
         if not barrier:
             raise ValueError("Barrier not found")
 
-        if barrier.status != BarrierStatus.APPROVED:
-            raise ValueError("Can only confirm approved barriers")
+        if barrier.status not in (BarrierStatus.PENDING, BarrierStatus.APPROVED):
+            raise ValueError("Can only confirm pending or approved barriers")
 
         exists = await self.confirmation_repo.exists(barrier_id, user_id)
         if exists:
@@ -144,8 +144,8 @@ class BarrierService:
         if not barrier:
             raise ValueError("Barrier not found")
 
-        if barrier.status != BarrierStatus.APPROVED:
-            raise ValueError("Can only complain about approved barriers")
+        if barrier.status not in (BarrierStatus.PENDING, BarrierStatus.APPROVED):
+            raise ValueError("Can only complain about pending or approved barriers")
 
         exists = await self.complaint_repo.exists(barrier_id, user_id)
         if exists:

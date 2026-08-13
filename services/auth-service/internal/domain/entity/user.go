@@ -38,6 +38,7 @@ type User struct {
 	ID           string
 	Email        valueobject.Email
 	PasswordHash string
+	Nickname     string
 	Role         Role
 	IsActive     bool
 	CreatedAt    time.Time
@@ -55,6 +56,11 @@ func NewUser(email valueobject.Email, passwordHash string, role Role) *User {
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+}
+
+func (u *User) UpdateNickname(nickname string) {
+	u.Nickname = nickname
+	u.UpdatedAt = time.Now().UTC()
 }
 
 func (u *User) UpdateRole(role Role) {

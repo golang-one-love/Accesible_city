@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = Field(default="moderation_user", alias="POSTGRES_USER")
     POSTGRES_PASSWORD: str = Field(default="moderation_pass", alias="POSTGRES_PASSWORD")
     POSTGRES_DB: str = Field(default="moderation_db", alias="POSTGRES_DB")
+    POSTGRES_SSL_MODE: str = Field(default="disable", alias="POSTGRES_SSL_MODE")
 
     REDIS_HOST: str = Field(default="localhost", alias="REDIS_HOST")
     REDIS_PORT: int = Field(default=6379, alias="REDIS_PORT")
@@ -31,7 +32,10 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        url = f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        if self.POSTGRES_SSL_MODE not in ("", "disable"):
+            url += f"?ssl={self.POSTGRES_SSL_MODE}"
+        return url
 
     @property
     def redis_url(self) -> str:

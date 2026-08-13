@@ -5,9 +5,10 @@ import { api } from '@shared/api/axios'
 export interface User {
   id: string
   email: string
+  nickname: string
   role: string
-  isActive: boolean
-  createdAt: string
+  is_active: boolean
+  created_at: string
 }
 
 interface AuthState {
@@ -17,6 +18,7 @@ interface AuthState {
   isInitialized: boolean
   setTokens: (access: string, refresh: string) => void
   setUser: (user: User) => void
+  updateUser: (patch: Partial<User>) => void
   logout: () => void
   initializeAuth: () => Promise<void>
   updateAccessToken: (token: string) => void
@@ -37,6 +39,8 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => set({ user }),
 
+      updateUser: (patch) => set({ user: { ...get().user!, ...patch } }),
+
       logout: () => {
         set({ user: null, accessToken: null, refreshToken: null })
         delete api.defaults.headers.common['Authorization']
@@ -54,8 +58,8 @@ export const useAuthStore = create<AuthState>()(
           set({ accessToken: response.data.access_token, refreshToken: response.data.refresh_token })
           api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`
           
-          const userResponse = await api.get('/auth/validate')
-          set({ user: userResponse.data, isInitialized: true })
+          const userResponse = await api.get('/auth/profile')
+          set({ user: { nickname: '', ...userResponse.data }, isInitialized: true })
         } catch {
           get().logout()
           set({ isInitialized: true })

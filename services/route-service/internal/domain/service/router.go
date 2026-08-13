@@ -27,6 +27,10 @@ func NewRouter(graph *entity.Graph, barrierRepo out.BarrierProvider) *Router {
 	}
 }
 
+func (r *Router) SetGraph(graph *entity.Graph) {
+	r.graph = graph
+}
+
 func (r *Router) BuildRoute(start, finish valueobject.Coordinates, profile entity.MobilityProfile) (*entity.Route, error) {
 	if !profile.IsValid() {
 		return nil, ErrInvalidProfile
@@ -77,11 +81,10 @@ func (r *Router) findNearestNode(coord valueobject.Coordinates) *entity.Node {
 }
 
 type aStarNode struct {
-	nodeID  string
-	gScore  float64
-	fScore  float64
-	prev    *aStarNode
-	index   int
+	nodeID string
+	gScore float64
+	fScore float64
+	index  int
 }
 
 type priorityQueue []*aStarNode
@@ -134,7 +137,7 @@ func (r *Router) aStar(startID, finishID string, blockedNodes map[string]bool, m
 		current := heap.Pop(&openSet).(*aStarNode)
 
 		if current.nodeID == finishID {
-			return r.reconstructPath(current, finishNode), nil
+			return r.reconstructPath(cameFrom, current, finishNode), nil
 		}
 
 		for _, edge := range r.graph.GetEdges(current.nodeID) {
@@ -174,30 +177,34 @@ func (r *Router) heuristic(a, b *entity.Node) float64 {
 	return coordA.HaversineDistance(coordB)
 }
 
-func (r *Router) reconstructPath(end *aStarNode, finishNode *entity.Node) *entity.Route {
+func (r *Router) reconstructPath(cameFrom map[string]*aStarNode, end *aStarNode, finishNode *entity.Node) *entity.Route {
 	route := entity.NewRoute()
-	var path []*aStarNode
-
-	for n := end; n != nil; n = n.prev {
-		path = append(path, n)
+	var path []string
+	for id := end.nodeID; ; {
+		path = append(path, id)
+		prev := cameFrom[id]
+		if prev == nil {
+			break
+		}
+		id = prev.nodeID
 	}
 
 	for i := len(path) - 1; i >= 0; i-- {
-		node := r.graph.GetNode(path[i].nodeID)
+		node := r.graph.GetNode(path[i])
 		if node != nil {
 			var dist float64
 			var sev int
 			if i < len(path)-1 {
-				prevNode := r.graph.GetNode(path[i+1].nodeID)
-				if prevNode != nil {
+				nextNode := r.graph.GetNode(path[i+1])
+				if nextNode != nil {
 					coord1 := valueobject.Coordinates{Latitude: node.Latitude, Longitude: node.Longitude}
-					coord2 := valueobject.Coordinates{Latitude: prevNode.Latitude, Longitude: prevNode.Longitude}
+					coord2 := valueobject.Coordinates{Latitude: nextNode.Latitude, Longitude: nextNode.Longitude}
 					dist = coord1.HaversineDistance(coord2)
-				}
-				for _, edge := range r.graph.GetEdges(path[i+1].nodeID) {
-					if edge.To == path[i].nodeID {
-						sev = edge.Severity
-						break
+					for _, edge := range r.graph.GetEdges(path[i]) {
+						if edge.To == path[i+1] {
+							sev = edge.Severity
+							break
+						}
 					}
 				}
 			}

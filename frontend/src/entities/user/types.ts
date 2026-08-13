@@ -3,6 +3,7 @@ export type UserRole = 'user' | 'volunteer' | 'moderator' | 'business_owner' | '
 export interface User {
   id: string
   email: string
+  nickname: string
   role: UserRole
   is_active: boolean
   created_at: string
@@ -22,7 +23,6 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string
   password: string
-  role: UserRole
 }
 
 export interface RefreshRequest {
@@ -34,4 +34,16 @@ export interface ValidateResponse {
   email: string
   role: string
   exp: number
+}
+
+export type RoleApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface RoleApplication {
+  id: string
+  user_id: string
+  requested_role: UserRole
+  comment: string
+  status: RoleApplicationStatus
+  created_at: string
+  reviewed_at: string
 }

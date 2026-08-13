@@ -34,6 +34,34 @@ func (u *authUseCase) GetUserByID(id string) (*entity.User, error) {
 	return u.authService.GetUserByID(id)
 }
 
-func (u *authUseCase) UpdateUserRole(userID string, role entity.Role) error {
-	return u.authService.UpdateUserRole(userID, role)
+func (u *authUseCase) UpdateProfile(userID, nickname string) (*entity.User, error) {
+	return u.authService.UpdateProfile(userID, nickname)
+}
+
+func (u *authUseCase) ChangePassword(userID, oldPassword, newPassword string) error {
+	return u.authService.ChangePassword(userID, oldPassword, newPassword)
+}
+
+func (u *authUseCase) UpdateUserRole(actorID string, actorRole entity.Role, userID string, role entity.Role) error {
+	return u.authService.UpdateUserRole(actorID, actorRole, userID, role)
+}
+
+func (u *authUseCase) ListUsers() ([]*entity.User, error) {
+	return u.authService.ListUsers()
+}
+
+func (u *authUseCase) SelfPromote(userID string, role entity.Role) (*entity.User, error) {
+	return u.authService.SelfPromote(userID, role)
+}
+
+func (u *authUseCase) ApplyForRole(userID string, requestedRole entity.Role, comment string) (*entity.RoleApplication, error) {
+	return u.authService.ApplyForRole(userID, requestedRole, comment)
+}
+
+func (u *authUseCase) ListApplications(actorRole entity.Role) ([]*entity.RoleApplication, error) {
+	return u.authService.ListApplications(actorRole)
+}
+
+func (u *authUseCase) ReviewApplication(actorID string, actorRole entity.Role, applicationID string, approve bool) (*entity.RoleApplication, error) {
+	return u.authService.ReviewApplication(actorID, actorRole, applicationID, approve)
 }
