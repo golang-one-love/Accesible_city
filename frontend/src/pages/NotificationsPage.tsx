@@ -15,15 +15,19 @@ interface Notification {
 
 const typeLabels: Record<string, string> = {
   barrier_approved: 'Барьер одобрен',
+  barrier_rejected: 'Барьер отклонен',
   barrier_resolved: 'Барьер устранен',
   barrier_nearby: 'Барьер рядом',
+  route_updated: 'Маршрут перестроен',
   new_poi: 'Новая точка',
 }
 
 const typeIcons: Record<string, string> = {
   barrier_approved: '✅',
+  barrier_rejected: '❌',
   barrier_resolved: '🟢',
   barrier_nearby: '⚠️',
+  route_updated: '🧭',
   new_poi: '📍',
 }
 
