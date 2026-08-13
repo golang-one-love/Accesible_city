@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,9 +42,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
-		logger.Fatal("failed to ping database", zap.Error(err))
-	}
+	waitForDB(logger, pool)
 
 	if err := postgres.EnsureSchema(context.Background(), pool); err != nil {
 		logger.Fatal("failed to ensure schema", zap.Error(err))
@@ -169,8 +168,30 @@ func loadConfig() config {
 	}
 }
 
+func waitForDB(logger *zap.Logger, pool *pgxpool.Pool) {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := pool.Ping(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		logger.Warn("database not ready, retrying in 5s", zap.Error(err))
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=" + c.PostgresSSLMode
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.PostgresUser, c.PostgresPassword),
+		Host:   c.PostgresHost + ":" + c.PostgresPort,
+		Path:   "/" + c.PostgresDB,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.PostgresSSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func getEnv(key, defaultValue string) string {
