@@ -307,6 +307,7 @@ services:
     container_name: accessible-path-prod-nginx
     volumes:
       - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/locations.prod.conf:/etc/nginx/conf.d/locations.prod.conf:ro
       - ./infra/nginx/ssl:/etc/nginx/ssl:ro
       - ./infra/nginx/certbot:/var/www/certbot:ro
     ports:
