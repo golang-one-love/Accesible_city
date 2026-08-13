@@ -202,7 +202,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # OSM graph import for Moscow needs >256M; 1G covers import and runtime routing
+          memory: 1G
           cpus: '0.5'
 
   poi-service:
