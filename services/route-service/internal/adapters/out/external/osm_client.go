@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,13 +24,13 @@ type OSMClient struct {
 func NewOSMClient(overpassURL string) *OSMClient {
 	return &OSMClient{
 		overpassURL: overpassURL,
-		httpClient:  &http.Client{Timeout: 120 * time.Second},
+		httpClient:  &http.Client{Timeout: 360 * time.Second},
 	}
 }
 
 func (c *OSMClient) FetchRoads(ctx context.Context, minLat, minLon, maxLat, maxLon float64) (*entity.Graph, error) {
 	query := fmt.Sprintf(
-		`[out:json][timeout:90];(way["highway"~"%s"](%f,%f,%f,%f););out body;>;out skel qt;`,
+		`[out:json][timeout:300];(way["highway"~"%s"](%f,%f,%f,%f););out body;>;out skel qt;`,
 		osmHighwayFilter, minLat, minLon, maxLat, maxLon,
 	)
 
@@ -40,6 +41,27 @@ func (c *OSMClient) FetchRoads(ctx context.Context, minLat, minLon, maxLat, maxL
 	req.URL.RawQuery = url.Values{"data": []string{query}}.Encode()
 	req.Header.Set("User-Agent", "accessible-path-route-service/1.0")
 
+	const maxAttempts = 3
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		graph, err := c.fetchOnce(req)
+		if err == nil {
+			return graph, nil
+		}
+		lastErr = err
+		slog.Warn("overpass fetch failed", "attempt", attempt, "error", err)
+		if attempt < maxAttempts {
+			select {
+			case <-time.After(5 * time.Second):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
+	return nil, fmt.Errorf("overpass fetch failed after %d attempts: %w", maxAttempts, lastErr)
+}
+
+func (c *OSMClient) fetchOnce(req *http.Request) (*entity.Graph, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("overpass request failed: %w", err)
