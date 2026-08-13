@@ -11,6 +11,7 @@ type NotificationType string
 const (
 	NotificationBarrierApproved NotificationType = "barrier_approved"
 	NotificationBarrierResolved NotificationType = "barrier_resolved"
+	NotificationBarrierRejected NotificationType = "barrier_rejected"
 	NotificationBarrierNearby   NotificationType = "barrier_nearby"
 	NotificationNewPOI          NotificationType = "new_poi"
 	NotificationRouteUpdated    NotificationType = "route_updated"

@@ -100,7 +100,9 @@ function MapView({ selectedBarrier, onSelectBarrier, onCloseModal, onMapClick, c
 
       {clickPoint && <Marker position={[clickPoint.latitude, clickPoint.longitude]} icon={clickIcon} />}
 
-      {barriers.map((barrier) => (
+      {barriers
+        .filter((barrier) => filters.status || barrier.status !== 'rejected')
+        .map((barrier) => (
         <BarrierMarker
           key={barrier.id}
           barrier={barrier}

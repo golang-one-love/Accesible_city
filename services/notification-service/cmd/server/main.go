@@ -70,6 +70,16 @@ func main() {
 	}()
 
 	go func() {
+		if err := redisEventBus.Subscribe("barrier.rejected", "notification-group", "notification-consumer-4", func(event map[string]interface{}) {
+			if err := notificationService.HandleBarrierRejected(event); err != nil {
+				logger.Error("handle barrier.rejected", zap.Error(err))
+			}
+		}); err != nil {
+			logger.Error("barrier.rejected consumer error", zap.Error(err))
+		}
+	}()
+
+	go func() {
 		if err := redisEventBus.Subscribe("route.updated", "notification-group", "notification-consumer-3", func(event map[string]interface{}) {
 			if err := notificationService.HandleRouteUpdated(event); err != nil {
 				logger.Error("handle route.updated", zap.Error(err))
