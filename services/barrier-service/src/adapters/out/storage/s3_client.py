@@ -8,25 +8,26 @@ from src.domain.repositories import PhotoStorage
 
 class S3Storage(PhotoStorage):
     def __init__(self):
+        endpoint = f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_USE_SSL else f"https://{settings.MINIO_ENDPOINT}"
         self.client = boto3.client(
             "s3",
-            endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_USE_SSL else f"https://{settings.MINIO_ENDPOINT}",
+            endpoint_url=endpoint,
             aws_access_key_id=settings.MINIO_ACCESS_KEY,
             aws_secret_access_key=settings.MINIO_SECRET_KEY,
-            config=Config(signature_version="s3v4"),
-            region_name="us-east-1",
+            config=Config(signature_version="s3v4", s3={"addressing_style": settings.S3_ADDRESSING_STYLE}),
+            region_name=settings.S3_REGION,
         )
         self.bucket = settings.MINIO_BUCKET
         public_endpoint = settings.MINIO_PUBLIC_URL
         self.public_client = None
-        if public_endpoint and public_endpoint != f"http://{settings.MINIO_ENDPOINT}":
+        if public_endpoint and public_endpoint != endpoint:
             self.public_client = boto3.client(
                 "s3",
                 endpoint_url=public_endpoint,
                 aws_access_key_id=settings.MINIO_ACCESS_KEY,
                 aws_secret_access_key=settings.MINIO_SECRET_KEY,
-                config=Config(signature_version="s3v4"),
-                region_name="us-east-1",
+                config=Config(signature_version="s3v4", s3={"addressing_style": settings.S3_ADDRESSING_STYLE}),
+                region_name=settings.S3_REGION,
             )
         self._ensure_bucket()
 
@@ -34,7 +35,14 @@ class S3Storage(PhotoStorage):
         try:
             self.client.head_bucket(Bucket=self.bucket)
         except self.client.exceptions.ClientError:
-            self.client.create_bucket(Bucket=self.bucket)
+            try:
+                self.client.create_bucket(Bucket=self.bucket)
+            except Exception as e:
+                print(f"[s3] bucket '{self.bucket}' not found and create_bucket failed: {e}. "
+                      "Pre-create it in the storage panel if uploads are expected.")
+        except Exception as e:
+            print(f"[s3] storage endpoint unreachable at startup ({e}). "
+                  "Uploads will fail until storage is available, service keeps running.")
 
     async def upload(self, key: str, data: bytes, content_type: str) -> str:
         self.client.put_object(

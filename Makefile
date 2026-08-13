@@ -2,7 +2,7 @@
 # Accessible Path - Makefile
 # =============================================================================
 
-.PHONY: help up down logs restart build test migrate clean ps
+.PHONY: help up down logs restart build test migrate clean ps prod-up prod-down prod-logs prod-build prod-status deploy
 
 # Default target
 help:
@@ -123,20 +123,27 @@ migrate-create:
 	@cd services/poi-service && alembic revision --autogenerate -m "$(name)"
 
 # -----------------------------------------------------------------------------
-# Production
+# Production (standalone stack for Beget VPS, see DEPLOY.md)
+# Uses .env.prod (copy of .env.prod.example)
 # -----------------------------------------------------------------------------
 
 prod-up:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
 prod-down:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+	docker compose --env-file .env.prod -f docker-compose.prod.yml down
 
 prod-logs:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+	docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f
 
 prod-build:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml build --parallel
+	docker compose --env-file .env.prod -f docker-compose.prod.yml build --parallel
+
+prod-status:
+	docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+
+deploy:
+	./deploy/deploy.sh up
 
 # -----------------------------------------------------------------------------
 # Cleanup
@@ -147,5 +154,5 @@ clean:
 	docker system prune -f
 
 clean-all:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v --rmi all --remove-orphans
+	docker compose --env-file .env.prod -f docker-compose.prod.yml down -v --rmi all --remove-orphans
 	docker system prune -af --volumes

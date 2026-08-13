@@ -120,6 +120,7 @@ type config struct {
 	PostgresUser     string
 	PostgresPassword string
 	PostgresDB       string
+	PostgresSSLMode  string
 	RedisAddr        string
 	RedisPassword    string
 	RedisDB          int
@@ -134,6 +135,7 @@ func loadConfig() config {
 		PostgresUser:     getEnv("POSTGRES_USER", "notification_user"),
 		PostgresPassword: getEnv("POSTGRES_PASSWORD", "notification_pass"),
 		PostgresDB:       getEnv("POSTGRES_DB", "notification_db"),
+		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 		RedisAddr:        getEnv("REDIS_HOST", "localhost") + ":" + getEnv("REDIS_PORT", "6379"),
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
 		RedisDB:          0,
@@ -142,7 +144,7 @@ func loadConfig() config {
 }
 
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=" + c.PostgresSSLMode
 }
 
 func getEnv(key, defaultValue string) string {

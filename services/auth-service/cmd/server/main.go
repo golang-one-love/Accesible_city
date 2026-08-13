@@ -115,6 +115,7 @@ type config struct {
 	PostgresUser           string
 	PostgresPassword       string
 	PostgresDB             string
+	PostgresSSLMode        string
 	JWTPrivateKeyPath      string
 	JWTPublicKeyPath       string
 	JWTAccessTTL           time.Duration
@@ -135,6 +136,7 @@ func loadConfig() config {
 		PostgresUser:          getEnv("POSTGRES_USER", "auth_user"),
 		PostgresPassword:      getEnv("POSTGRES_PASSWORD", "auth_pass"),
 		PostgresDB:            getEnv("POSTGRES_DB", "auth_db"),
+		PostgresSSLMode:       getEnv("POSTGRES_SSLMODE", "disable"),
 		JWTPrivateKeyPath:     getEnv("JWT_PRIVATE_KEY_PATH", "/keys/private.pem"),
 		JWTPublicKeyPath:      getEnv("JWT_PUBLIC_KEY_PATH", "/keys/public.pem"),
 		JWTAccessTTL:          accessTTL,
@@ -146,7 +148,7 @@ func loadConfig() config {
 }
 
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=" + c.PostgresSSLMode
 }
 
 func seedModerator(userRepo *postgres.UserRepository, logger *zap.Logger, cfg config) error {

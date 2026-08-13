@@ -136,6 +136,7 @@ type config struct {
 	PostgresUser      string
 	PostgresPassword  string
 	PostgresDB        string
+	PostgresSSLMode   string
 	BarrierServiceURL string
 	OSMOverpassURL    string
 	OSMDefaultBBox    string
@@ -152,6 +153,7 @@ func loadConfig() config {
 		PostgresUser:      getEnv("POSTGRES_USER", "route_user"),
 		PostgresPassword:  getEnv("POSTGRES_PASSWORD", "route_pass"),
 		PostgresDB:        getEnv("POSTGRES_DB", "route_db"),
+		PostgresSSLMode:   getEnv("POSTGRES_SSLMODE", "disable"),
 		BarrierServiceURL: getEnv("BARRIER_SERVICE_URL", "http://barrier-service:8000"),
 		OSMOverpassURL:    getEnv("OSM_OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
 		OSMDefaultBBox:    getEnv("OSM_DEFAULT_BBOX", "55.7000,37.5200,55.8000,37.7200"),
@@ -162,7 +164,7 @@ func loadConfig() config {
 }
 
 func (c config) databaseURL() string {
-	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=disable"
+	return "postgres://" + c.PostgresUser + ":" + c.PostgresPassword + "@" + c.PostgresHost + ":" + c.PostgresPort + "/" + c.PostgresDB + "?sslmode=" + c.PostgresSSLMode
 }
 
 func getEnv(key, defaultValue string) string {

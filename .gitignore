@@ -6,11 +6,20 @@
 .env
 .env.local
 .env.*.local
+.env.prod
 
 # Docker
 docker-compose.override.yml
 *.tar
 *.tar.gz
+
+# Keys/Certs
+*.pem
+*.key
+*.crt
+keys/
+infra/nginx/ssl/
+infra/nginx/certbot/
 
 # IDE
 .idea/
@@ -76,12 +85,6 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
-
-# Keys/Certs
-*.pem
-*.key
-*.crt
-keys/
 
 # Terraform/Infrastructure (if added later)
 *.tfstate

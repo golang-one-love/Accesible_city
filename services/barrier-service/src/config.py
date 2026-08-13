@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = Field(default="barrier_user", alias="POSTGRES_USER")
     POSTGRES_PASSWORD: str = Field(default="barrier_pass", alias="POSTGRES_PASSWORD")
     POSTGRES_DB: str = Field(default="barrier_db", alias="POSTGRES_DB")
+    POSTGRES_SSL_MODE: str = Field(default="disable", alias="POSTGRES_SSL_MODE")
 
     REDIS_HOST: str = Field(default="localhost", alias="REDIS_HOST")
     REDIS_PORT: int = Field(default=6379, alias="REDIS_PORT")
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     MINIO_BUCKET: str = Field(default="barrier-photos", alias="MINIO_BUCKET")
     MINIO_USE_SSL: bool = Field(default=False, alias="MINIO_USE_SSL")
+    S3_REGION: str = Field(default="us-east-1", alias="S3_REGION")
+    S3_ADDRESSING_STYLE: str = Field(default="path", alias="S3_ADDRESSING_STYLE")
 
     STREAM_BARRIER_CREATED: str = Field(default="barrier.created", alias="STREAM_BARRIER_CREATED")
 
@@ -33,7 +36,10 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        url = f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        if self.POSTGRES_SSL_MODE not in ("", "disable"):
+            url += f"?ssl={self.POSTGRES_SSL_MODE}"
+        return url
 
     @property
     def redis_url(self) -> str:
