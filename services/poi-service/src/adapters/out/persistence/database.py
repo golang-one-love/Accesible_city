@@ -10,6 +10,9 @@ engine = create_async_engine(
     echo=settings.DB_ECHO,
     poolclass=NullPool if settings.ENV == "test" else None,
     pool_pre_ping=True,
+    pool_size=3,
+    max_overflow=0,
+    pool_timeout=30,
 )
 
 async_session_factory = async_sessionmaker(

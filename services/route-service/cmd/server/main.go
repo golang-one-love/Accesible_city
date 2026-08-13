@@ -29,7 +29,13 @@ func main() {
 
 	cfg := loadConfig()
 
-	pool, err := pgxpool.New(context.Background(), cfg.databaseURL())
+	poolConfig, err := pgxpool.ParseConfig(cfg.databaseURL())
+	if err != nil {
+		logger.Fatal("failed to parse database config", zap.Error(err))
+	}
+	poolConfig.MaxConns = 3
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		logger.Fatal("failed to connect to database", zap.Error(err))
 	}
