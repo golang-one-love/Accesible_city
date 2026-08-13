@@ -110,6 +110,10 @@ cmd_restart() {
   require_env_file
   "${COMPOSE_CMD[@]}" build --parallel
   "${COMPOSE_CMD[@]}" up -d --remove-orphans
+  # nginx caches backend IPs (upstream DNS) at startup; recreated backends
+  # get fresh container IPs from docker's embedded DNS, so force nginx to
+  # re-resolve, otherwise /api/* proxies return 502 until a manual restart
+  "${COMPOSE_CMD[@]}" restart nginx
   log "Restarted"
 }
 
