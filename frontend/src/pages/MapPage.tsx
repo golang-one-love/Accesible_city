@@ -207,6 +207,7 @@ export function MapPage() {
   const [clickPoint, setClickPoint] = useState<Coordinates | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [routeResult, setRouteResult] = useState<any>(null)
+  const [routeCollapsed, setRouteCollapsed] = useState<boolean>(() => window.innerWidth < 880)
 
   const handleMapClick = (point: Coordinates) => {
     setSelectedBarrier(null)
@@ -234,7 +235,7 @@ export function MapPage() {
   }
 
   return (
-    <div className="map-page">
+    <div className={`map-page${routeCollapsed ? ' route-collapsed' : ''}`}>
       <div className="map-container">
         <MapView
           selectedBarrier={selectedBarrier}
@@ -270,6 +271,8 @@ export function MapPage() {
         clickPoint={clickPoint}
         onPointSelected={() => setClickPoint(null)}
         onRouteResult={setRouteResult}
+        collapsed={routeCollapsed}
+        onToggleCollapsed={() => setRouteCollapsed(!routeCollapsed)}
       />
     </div>
   )

@@ -1240,6 +1240,53 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
+.route-panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text);
+}
+
+.route-panel-toggle:hover {
+  background: var(--color-secondary);
+}
+
+.route-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.route-panel-caret {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.route-panel.collapsed {
+  max-height: none;
+  overflow: visible;
+}
+
+.route-panel.collapsed .route-pick-point,
+.route-panel.collapsed .route-form {
+  display: none;
+}
+
+.route-collapsed .map-controls {
+  bottom: 76px;
+}
+
+.route-collapsed .click-point-panel {
+  bottom: 76px;
+}
+
 .route-form {
   padding: 16px;
 }
