@@ -17,7 +17,6 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
-    op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
 
     poi_category_enum = sa.Enum(
         'restaurant', 'cafe', 'shop', 'pharmacy', 'hospital', 'clinic',

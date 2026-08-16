@@ -17,7 +17,6 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
-    op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
 
     barrier_type_enum = sa.Enum(
         'high_curb', 'broken_elevator', 'closed_sidewalk', 'stairs',

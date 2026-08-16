@@ -38,24 +38,29 @@ GRANT ALL PRIVILEGES ON DATABASE notification_db TO notification_user;
 ALTER DATABASE notification_db OWNER TO notification_user;
 
 -- Enable extensions that might be needed
+-- NOTE: postgis is NOT available in the postgres:16-alpine image and is not
+-- used by any service (tables are created via SQLAlchemy create_all), so it
+-- must not be requested here.
 \c auth_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c barrier_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c moderation_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c route_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c poi_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c notification_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
